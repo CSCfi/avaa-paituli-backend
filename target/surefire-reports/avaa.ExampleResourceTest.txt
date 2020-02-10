@@ -1,0 +1,11 @@
+-------------------------------------------------------------------------------
+Test set: avaa.ExampleResourceTest
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 7.518 s <<< FAILURE! - in avaa.ExampleResourceTest
+testHelloEndpoint  Time elapsed: 1.355 s  <<< FAILURE!
+java.lang.AssertionError: 
+1 expectation failed.
+Expected status code <200> but was <404>.
+
+	at avaa.ExampleResourceTest.testHelloEndpoint(ExampleResourceTest.java:17)
+
