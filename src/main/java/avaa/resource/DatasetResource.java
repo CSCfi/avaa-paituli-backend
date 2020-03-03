@@ -1,4 +1,6 @@
-package avaa;
+package avaa.resource;
+
+import avaa.entity.Dataset;
 
 import java.util.List;
 
@@ -8,13 +10,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
 @Path("/getDatasets")
-public class DatasetResource{
+public class DatasetResource {
 
     @GET
-    @Produces(MediaType.APPLICATION_JSON) 
-
+    @Produces(MediaType.APPLICATION_JSON)
     public List<Dataset> paituliDatasets() {
         return Dataset.listAll();
     }
-
 }
