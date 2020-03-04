@@ -1,9 +1,9 @@
 package fi.csc.avaa.paituli.entity;
 
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+
 import javax.persistence.Entity;
 import javax.persistence.Id;
-
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 
 @Entity
 public class Dataset extends PanacheEntityBase {
