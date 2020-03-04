@@ -4,7 +4,7 @@ import javax.validation.constraints.NotBlank;
 
 public class DownloadRequest {
 
-    @NotBlank(message="missing parameter: filePaths")
+    @NotBlank
     public String filePaths;
     public String org;
     public String data;
@@ -12,7 +12,7 @@ public class DownloadRequest {
     public String year;
     public String coordsys;
     public String format;
-    @NotBlank(message="missing parameter: email")
+    @NotBlank
     public String email;
     public String dataId;
     public String downloadType;
