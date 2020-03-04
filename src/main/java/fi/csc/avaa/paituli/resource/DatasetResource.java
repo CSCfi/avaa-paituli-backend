@@ -1,5 +1,6 @@
 package fi.csc.avaa.paituli.resource;
 
+import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.entity.Dataset;
 
 import java.util.List;
@@ -9,7 +10,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
-@Path("/getDatasets")
+@Path(Constants.PATH_DATASETS)
 public class DatasetResource {
 
     @GET
