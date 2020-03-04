@@ -1,6 +1,6 @@
-package avaa.resource;
+package fi.csc.avaa.paituli.resource;
 
-import avaa.model.DownloadRequest;
+import fi.csc.avaa.paituli.model.DownloadRequest;
 
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;

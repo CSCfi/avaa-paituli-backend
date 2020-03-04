@@ -1,4 +1,4 @@
-package avaa.model;
+package fi.csc.avaa.paituli.model;
 
 import javax.validation.constraints.NotBlank;
 

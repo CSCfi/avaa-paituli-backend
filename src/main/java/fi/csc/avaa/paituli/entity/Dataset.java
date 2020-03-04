@@ -1,4 +1,4 @@
-package avaa.entity;
+package fi.csc.avaa.paituli.entity;
 
 import javax.persistence.Entity;
 import javax.persistence.Id;

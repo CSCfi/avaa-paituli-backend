@@ -1,4 +1,4 @@
-package avaa.resource;
+package fi.csc.avaa.paituli.resource;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;

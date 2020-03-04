@@ -1,4 +1,4 @@
-package avaa.entity;
+package fi.csc.avaa.paituli.entity;
 
 import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 

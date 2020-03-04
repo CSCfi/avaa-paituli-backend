@@ -1,6 +1,6 @@
-package avaa.resource;
+package fi.csc.avaa.paituli.resource;
 
-import avaa.entity.Dataset;
+import fi.csc.avaa.paituli.entity.Dataset;
 
 import java.util.List;
 
