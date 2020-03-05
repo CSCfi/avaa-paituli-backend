@@ -5,6 +5,7 @@ import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.util.EmailUtils;
 
 import javax.enterprise.context.ApplicationScoped;
+import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +22,8 @@ public class DownloadService {
             } else if (downloadRequest.downloadType == DownloadType.ZIP) {
 
             }
-            EmailUtils.sendEmail();
+            String[] filenames = { "TODO1.zip", "TODO2.zip" };
+            EmailUtils.sendEmail("fi", downloadRequest, Arrays.asList(filenames), "http://example.com/TODOS.zip");
         });
     }
 }
