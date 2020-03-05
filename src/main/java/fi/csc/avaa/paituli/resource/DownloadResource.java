@@ -2,7 +2,9 @@ package fi.csc.avaa.paituli.resource;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import fi.csc.avaa.paituli.service.DownloadService;
 
+import javax.inject.Inject;
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -16,8 +18,12 @@ import javax.ws.rs.core.Response;
 @Consumes(MediaType.APPLICATION_JSON)
 public class DownloadResource {
 
+    @Inject
+    DownloadService downloadService;
+
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
+        downloadService.generateDownload(downloadRequest);
         return Response.ok().build();
     }
 }
