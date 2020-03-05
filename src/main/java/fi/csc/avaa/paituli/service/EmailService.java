@@ -1,19 +1,29 @@
-package fi.csc.avaa.paituli.util;
+package fi.csc.avaa.paituli.service;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import io.quarkus.mailer.Mail;
+import io.quarkus.mailer.ReactiveMailer;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.ws.rs.core.Response;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletionStage;
 
-public final class EmailUtils {
+@ApplicationScoped
+public class EmailService {
 
-    public static void sendEmail(String language, DownloadRequest request, List<String> filenameList, String zipUrl) {
+    @Inject
+    ReactiveMailer mailer;
+
+    public CompletionStage<Response> sendEmail(String language, DownloadRequest request,
+                                               List<String> filenameList, String zipUrl) {
         ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
-        String fromAddress = messages.getString(Constants.MESSAGE_KEY_EMAIL_FROM_ADDRESS);
         String subject = messages.getString(Constants.MESSAGE_KEY_EMAIL_SUBJECT);
         String template = messages.getString(Constants.MESSAGE_KEY_EMAIL_BODY_TEMPLATE);
 
@@ -28,8 +38,6 @@ public final class EmailUtils {
         String filenames = "<br>" + String.join("<br>", filenameList) + ".";
         String body = MessageFormat.format(template, datasetInfo.toString(), filenames, zipUrl);
 
-        System.out.println(fromAddress);
-        System.out.println(subject);
-        System.out.println(body);
+        return mailer.send(Mail.withHtml(request.email, subject, body)).thenApply(x -> Response.accepted().build());
     }
 }
