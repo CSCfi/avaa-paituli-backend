@@ -1,19 +1,17 @@
 package fi.csc.avaa.paituli.util;
 
-import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import fi.csc.avaa.paituli.constants.Constants;
+
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 public class EmailUtils {
 
-    public static void sendEmail() {
-        try {
-            URI uri = EmailUtils.class.getClassLoader().getResource("email/template_fi").toURI();
-            String template = new String(Files.readAllBytes(Paths.get(uri)), Charset.forName("utf-8"));
-            // MessageFormat.format(....
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    public static void sendEmail(String language) {
+        ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
+        String fromAddress = messages.getString(Constants.MESSAGE_KEY_EMAIL_FROM_ADDRESS);
+        String subject = messages.getString(Constants.MESSAGE_KEY_EMAIL_SUBJECT);
+        String body = messages.getString(Constants.MESSAGE_KEY_EMAIL_BODY_TEMPLATE);
+
     }
 }
