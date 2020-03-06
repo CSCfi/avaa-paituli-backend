@@ -12,8 +12,8 @@ public class MockDownloadService extends DownloadService {
     private DownloadRequest downloadRequest;
 
     @Override
-    public void generateDownload(DownloadRequest downloadRequest) {
-        this.downloadRequest = downloadRequest;
+    public void generateDownload(DownloadRequest request) {
+        this.downloadRequest = request;
     }
 
     public DownloadRequest getDownloadRequest() {
