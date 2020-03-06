@@ -5,12 +5,8 @@ import fi.csc.avaa.paituli.model.DownloadRequest;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.ws.rs.core.Response;
 import java.util.Arrays;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 
 @ApplicationScoped
 public class DownloadService {
@@ -18,10 +14,8 @@ public class DownloadService {
     @Inject
     EmailService emailService;
 
-    ThreadPoolExecutor executor = new ThreadPoolExecutor(10, 10, 1, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-
     public void generateDownload(DownloadRequest downloadRequest) {
-        executor.execute(() -> {
+        CompletableFuture.runAsync(() -> {
             if (downloadRequest.downloadType == DownloadType.LIST) {
 
             } else if (downloadRequest.downloadType == DownloadType.ZIP) {

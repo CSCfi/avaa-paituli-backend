@@ -21,7 +21,7 @@ public class EmailService {
     @Inject
     ReactiveMailer mailer;
 
-    public CompletionStage<Response> sendEmail(String language, DownloadRequest request,
+    protected CompletionStage<Response> sendEmail(String language, DownloadRequest request,
                                                List<String> filenameList, String zipUrl) {
         ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
         String subject = messages.getString(Constants.MESSAGE_KEY_EMAIL_SUBJECT);
