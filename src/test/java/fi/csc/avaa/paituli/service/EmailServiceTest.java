@@ -31,11 +31,16 @@ public class EmailServiceTest {
     public void shouldSendEmailWithFilledTemplate() {
         DownloadRequest request = new DownloadRequest();
         request.email = "test@example.com";
-        request.data = "testdata";
-        request.year = "1999";
+        request.data = "il_monthly_precipitation_10km_2014_geotiff_euref";
+        request.org = "Ilmatieteen laitos";
+        request.year = "1961-2014";
+        request.scale = "1 km x 1 km";
+        request.coordsys = "ETRS-TM35FIN";
+        request.format = "TIFF";
         String filename1 = "test1.zip";
         String filename2 = "test2.zip";
         String zipUrl = "http://example.com/test.zip";
+
         emailService.sendEmail("fi", request, Arrays.asList(filename1, filename2), zipUrl);
 
         List<Mail> sent = mailbox.getMessagesSentTo(request.email);
@@ -45,6 +50,15 @@ public class EmailServiceTest {
                 .hasSize(1)
                 .contains(request.email);
         assertThat(mail.getHtml())
-                .contains(request.data, request.year, filename1, filename2, zipUrl);
+                .contains(request.data,
+                        request.year,
+                        request.org,
+                        request.year,
+                        request.scale,
+                        request.coordsys,
+                        request.format,
+                        filename1,
+                        filename2,
+                        zipUrl);
     }
 }
