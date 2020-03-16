@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.io;
+package fi.csc.avaa.paituli.download.io;
 
 public class FileOperationException extends RuntimeException {
 

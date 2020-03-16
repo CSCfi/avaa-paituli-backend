@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.resource;
+package fi.csc.avaa.paituli.rest;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.model.DownloadRequest;
@@ -23,7 +23,7 @@ public class DownloadResource {
 
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
-        downloadService.createDownload(downloadRequest);
+        downloadService.download(downloadRequest);
         return Response.ok().build();
     }
 }
