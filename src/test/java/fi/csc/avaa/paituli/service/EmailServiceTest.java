@@ -38,7 +38,7 @@ public class EmailServiceTest {
         final DownloadRequest request = new DownloadRequest();
         request.filePaths = Arrays.asList(filename1, filename2);
         request.email = "test@example.com";
-        request.data = "il_monthly_precipitation_10km_2014_geotiff_euref";
+        request.data = "Kuukauden sademäärä, 1km";
         request.org = "Ilmatieteen laitos";
         request.year = "1961-2014";
         request.scale = "1 km x 1 km";

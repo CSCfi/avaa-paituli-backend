@@ -21,6 +21,9 @@ public class DownloadService {
     @Inject
     EmailService emailService;
 
+    @Inject
+    LogService logService;
+
     public void download(DownloadRequest request) {
         CompletableFuture.supplyAsync(() ->
                 request.downloadType.equals(DownloadType.ZIP)
@@ -30,8 +33,8 @@ public class DownloadService {
             if (err != null) {
                 System.err.println("Could not generate download: " + err.getMessage());
             } else {
-
                 emailService.sendEmail("fi", request, downloadUrl);
+                logService.log(request);
             }
         });
     }
