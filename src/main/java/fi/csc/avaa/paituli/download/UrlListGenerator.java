@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @ApplicationScoped
-public class FileListGenerator extends DownloadGeneratorBase {
+public class UrlListGenerator extends DownloadGeneratorBase {
 
     @ConfigProperty(name = "paituli.download.ftpBaseUrl")
     String ftpBaseUrl;

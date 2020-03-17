@@ -2,7 +2,6 @@ package fi.csc.avaa.paituli.service;
 
 import fi.csc.avaa.paituli.entity.LogEvent;
 import fi.csc.avaa.paituli.model.DownloadRequest;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
