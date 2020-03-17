@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.service;
+package fi.csc.avaa.paituli.email;
 
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.mailer.Mail;
@@ -14,10 +14,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
-public class EmailServiceTest {
+public class EmailSenderTest {
 
     @Inject
-    EmailService emailService;
+    EmailSender emailSender;
 
     @Inject
     MockMailbox mailbox;
@@ -39,9 +39,9 @@ public class EmailServiceTest {
         request.format = "TIFF";
         String filename1 = "test1.zip";
         String filename2 = "test2.zip";
-        String zipUrl = "http://example.com/test.zip";
+        String downloadUrl = "http://example.com/test.zip";
 
-        emailService.sendEmail("fi", request, Arrays.asList(filename1, filename2), zipUrl);
+        emailSender.sendEmail("fi", request, Arrays.asList(filename1, filename2), downloadUrl);
 
         List<Mail> sent = mailbox.getMessagesSentTo(request.email);
         assertThat(sent).hasSize(1);
@@ -59,6 +59,6 @@ public class EmailServiceTest {
                         request.format,
                         filename1,
                         filename2,
-                        zipUrl);
+                        downloadUrl);
     }
 }

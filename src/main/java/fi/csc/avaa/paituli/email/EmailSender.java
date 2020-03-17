@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.service;
+package fi.csc.avaa.paituli.email;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.model.DownloadRequest;
@@ -16,13 +16,13 @@ import java.util.StringJoiner;
 import java.util.concurrent.CompletionStage;
 
 @ApplicationScoped
-public class EmailService {
+public class EmailSender {
 
     @Inject
     ReactiveMailer mailer;
 
-    protected CompletionStage<Response> sendEmail(String language, DownloadRequest request,
-                                               List<String> filenameList, String zipUrl) {
+    public CompletionStage<Response> sendEmail(String language, DownloadRequest request,
+                                               List<String> filenameList, String downloadUrl) {
         ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
         String subject = messages.getString(Constants.MESSAGE_KEY_EMAIL_SUBJECT);
         String template = messages.getString(Constants.MESSAGE_KEY_EMAIL_BODY_TEMPLATE);
@@ -36,7 +36,7 @@ public class EmailService {
         if (request.format != null) datasetInfo.add(request.format);
 
         String filenames = "<br>" + String.join("<br>", filenameList) + ".";
-        String body = MessageFormat.format(template, datasetInfo.toString(), filenames, zipUrl);
+        String body = MessageFormat.format(template, datasetInfo.toString(), filenames, downloadUrl);
 
         return mailer.send(Mail.withHtml(request.email, subject, body)).thenApply(x -> Response.accepted().build());
     }
