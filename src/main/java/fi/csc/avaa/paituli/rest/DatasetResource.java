@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.resource;
+package fi.csc.avaa.paituli.rest;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.entity.Dataset;

@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.io;
+package fi.csc.avaa.paituli.download.io;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import org.apache.commons.io.FilenameUtils;

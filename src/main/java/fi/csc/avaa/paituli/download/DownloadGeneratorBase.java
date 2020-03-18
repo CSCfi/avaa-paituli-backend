@@ -1,7 +1,7 @@
 package fi.csc.avaa.paituli.download;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
-import fi.csc.avaa.paituli.io.FileOperations;
+import fi.csc.avaa.paituli.download.io.FileOperations;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.inject.Inject;
@@ -27,7 +27,7 @@ public abstract class DownloadGeneratorBase {
     @ConfigProperty(name = "paituli.download.filePrefix")
     String filePrefix;
 
-    public abstract String generate(String[] filePaths);
+    public abstract String generate(List<String> filePaths);
 
     String getOutputFilename(DownloadType type) {
         String randomNumbers = new Random().ints(8, 0, 10)
@@ -44,9 +44,9 @@ public abstract class DownloadGeneratorBase {
         return String.format("%s/%s", outputBaseUrl, outputFilename);
     }
 
-    List<String> collectAbsolutePaths(String[] filePaths) {
+    List<String> collectAbsolutePaths(List<String> filePaths) {
         List<String> absolutePaths = new ArrayList<>();
-        for (String filePath : filePaths) {
+        filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s/%s", inputPath, filePath);
             if (absolutePath.contains("*")) {
                 absolutePaths.addAll(findMatchingFiles(absolutePath));
@@ -57,7 +57,7 @@ public abstract class DownloadGeneratorBase {
                     System.err.println("Requested file cannot be found from path " + absolutePath);
                 }
             }
-        }
+        });
         if (absolutePaths.isEmpty()) {
             throw new IllegalArgumentException("There were no existing files listed in the filename list");
         }

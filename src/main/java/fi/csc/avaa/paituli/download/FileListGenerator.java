@@ -13,7 +13,7 @@ public class FileListGenerator extends DownloadGeneratorBase {
     @ConfigProperty(name = "paituli.download.ftpBaseUrl")
     String ftpBaseUrl;
 
-    public String generate(String[] filePaths) {
+    public String generate(List<String> filePaths) {
         List<String> ftpUrls = collectFtpUrls(filePaths);
         String outputFileName = getOutputFilename(DownloadType.LIST);
         String outputFilePath = getOutputFilePath(outputFileName);
@@ -21,7 +21,7 @@ public class FileListGenerator extends DownloadGeneratorBase {
         return getDownloadUrl(outputFileName);
     }
 
-    private List<String> collectFtpUrls(String[] filePaths) {
+    private List<String> collectFtpUrls(List<String> filePaths) {
         return collectAbsolutePaths(filePaths)
                 .stream()
                 .sorted()

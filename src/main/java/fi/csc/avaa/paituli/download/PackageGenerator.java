@@ -8,7 +8,7 @@ import java.util.List;
 @ApplicationScoped
 public class PackageGenerator extends DownloadGeneratorBase {
 
-    public String generate(String[] filePaths) {
+    public String generate(List<String> filePaths) {
         List<String> absolutePaths = collectAbsolutePaths(filePaths);
         String outputFileName = getOutputFilename(DownloadType.ZIP);
         String outputFilePath = getOutputFilePath(outputFileName);

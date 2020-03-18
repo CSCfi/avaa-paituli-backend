@@ -1,8 +1,8 @@
 package fi.csc.avaa.paituli.download;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
-import fi.csc.avaa.paituli.io.FileOperationException;
-import fi.csc.avaa.paituli.io.FileOperations;
+import fi.csc.avaa.paituli.download.io.FileOperationException;
+import fi.csc.avaa.paituli.download.io.FileOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,7 +51,7 @@ public class PackageGeneratorTest {
     @Test
     public void fileShouldBePackagedToOutputFile() {
         final String filePath = "file.zip";
-        final String[] filePaths = {filePath};
+        final List<String> filePaths = Collections.singletonList(filePath);
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(true);
@@ -78,7 +79,7 @@ public class PackageGeneratorTest {
     public void nonExistingFileShouldNotCauseException() {
         final String filePath1 = "file.zip";
         final String filePath2 = "doesnotexist.zip";
-        final String[] filePaths = { filePath1, filePath2 };
+        final List<String> filePaths = Arrays.asList(filePath1, filePath2);
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath1)))
                 .thenReturn(true);
@@ -110,17 +111,17 @@ public class PackageGeneratorTest {
     public void wildcardFilePathsShouldBeExpanded() {
         final String normalFilePath = "normal.zip";
         final String wildcardFilePath = "file*.zip";
-        final String[] filePaths = { normalFilePath, wildcardFilePath };
+        final List<String> filePaths = Arrays.asList(normalFilePath, wildcardFilePath);
         final String wildcardFilePathAsRegex = "file.*\\.zip";
-        final String[] matchingFiles = {
+        final List<String> matchingFiles = Arrays.asList(
                 absolutePathFor("file1.zip"),
                 absolutePathFor("file2.zip")
-        };
+        );
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(normalFilePath)))
                 .thenReturn(true);
         Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
-                .thenReturn(Arrays.asList(matchingFiles));
+                .thenReturn(matchingFiles);
 
         String downloadUrl = generator.generate(filePaths);
 
@@ -139,8 +140,8 @@ public class PackageGeneratorTest {
                 .hasSize(3)
                 .contains(
                         absolutePathFor(normalFilePath),
-                        matchingFiles[0],
-                        matchingFiles[1]
+                        matchingFiles.get(0),
+                        matchingFiles.get(1)
                 );
         assertThat(stringCaptor.getValue())
                 .startsWith(outputPath + "/" + filePrefix)
@@ -150,7 +151,7 @@ public class PackageGeneratorTest {
     @Test
     public void shouldThrowExceptionWhenNoFilesAreFound() {
         final String filePath = "file.zip";
-        final String[] filePaths = {filePath};
+        final List<String> filePaths = Collections.singletonList(filePath);
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
@@ -163,7 +164,7 @@ public class PackageGeneratorTest {
     @Test
     public void exceptionsInFindFilenamesShouldBePropagated() {
         final String wildcardFilePath = "file*.zip";
-        final String[] filePaths = { wildcardFilePath };
+        final List<String> filePaths = Collections.singletonList(wildcardFilePath);
         final String wildcardFilePathAsRegex = "file.*\\.zip";
 
         Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
@@ -177,7 +178,7 @@ public class PackageGeneratorTest {
     @Test
     public void exceptionsInWritingOutputShouldBePropagated() {
         final String filePath = "file.zip";
-        final String[] filePaths = {filePath};
+        final List<String> filePaths = Collections.singletonList(filePath);
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(true);

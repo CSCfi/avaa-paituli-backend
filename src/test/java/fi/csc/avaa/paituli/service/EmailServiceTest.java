@@ -1,4 +1,4 @@
-package fi.csc.avaa.paituli.email;
+package fi.csc.avaa.paituli.service;
 
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.mailer.Mail;
@@ -8,16 +8,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import javax.inject.Inject;
+import javax.ws.rs.core.Response;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
-public class EmailSenderTest {
+public class EmailServiceTest {
 
     @Inject
-    EmailSender emailSender;
+    EmailService emailService;
 
     @Inject
     MockMailbox mailbox;
@@ -28,20 +31,23 @@ public class EmailSenderTest {
     }
 
     @Test
-    public void shouldSendEmailWithFilledTemplate() {
-        DownloadRequest request = new DownloadRequest();
+    public void shouldSendEmailWithFilledTemplate() throws ExecutionException, InterruptedException {
+        final String filename1 = "test1.zip";
+        final String filename2 = "test2.zip";
+        final String downloadUrl = "http://example.com/test.zip";
+        final DownloadRequest request = new DownloadRequest();
+        request.filePaths = Arrays.asList(filename1, filename2);
         request.email = "test@example.com";
-        request.data = "il_monthly_precipitation_10km_2014_geotiff_euref";
+        request.data = "Kuukauden sademäärä, 1km";
         request.org = "Ilmatieteen laitos";
         request.year = "1961-2014";
         request.scale = "1 km x 1 km";
         request.coordsys = "ETRS-TM35FIN";
         request.format = "TIFF";
-        String filename1 = "test1.zip";
-        String filename2 = "test2.zip";
-        String downloadUrl = "http://example.com/test.zip";
 
-        emailSender.sendEmail("fi", request, Arrays.asList(filename1, filename2), downloadUrl);
+        CompletionStage<Response> completionStage = emailService.sendEmail("fi", request, downloadUrl);
+        // block
+        completionStage.toCompletableFuture().get();
 
         List<Mail> sent = mailbox.getMessagesSentTo(request.email);
         assertThat(sent).hasSize(1);

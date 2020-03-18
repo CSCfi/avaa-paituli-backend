@@ -1,10 +1,12 @@
-package fi.csc.avaa.paituli.resource;
+package fi.csc.avaa.paituli.rest;
 
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.endsWith;
@@ -16,7 +18,7 @@ public class DownloadResourceValidationsTest {
     @Test
     public void shouldReturn400WithMissingEmail() {
         DownloadRequest request = new DownloadRequest();
-        request.filePaths = "test";
+        request.filePaths = Collections.singletonList("test");
         request.downloadType = DownloadType.ZIP;
 
         testValidationError(request, "must not be blank", "email");
@@ -28,14 +30,24 @@ public class DownloadResourceValidationsTest {
         request.email = "test@example.com";
         request.downloadType = DownloadType.ZIP;
 
-        testValidationError(request, "must not be blank", "filePaths");
+        testValidationError(request, "must not be empty", "filePaths");
+    }
+
+    @Test
+    public void shouldReturn400WithEmptyFilePaths() {
+        DownloadRequest request = new DownloadRequest();
+        request.email = "test@example.com";
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.emptyList();
+
+        testValidationError(request, "must not be empty", "filePaths");
     }
 
     @Test
     public void shouldReturn400WithMissingDownloadType() {
         DownloadRequest request = new DownloadRequest();
         request.email = "test@example.com";
-        request.filePaths = "test";
+        request.filePaths = Collections.singletonList("test");
 
         testValidationError(request, "must not be null", "downloadType");
     }
