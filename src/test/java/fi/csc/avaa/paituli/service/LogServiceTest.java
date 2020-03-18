@@ -47,7 +47,6 @@ public class LogServiceTest {
         assertThat(event.saltedhash).isNotEqualTo(email);
         assertThat(event.dataset).isEqualTo(dataId);
         assertThat(event.organization).isEqualTo(expectedOrganization);
-        // see comment in service
         assertThat(event.numberOfFiles).isEqualTo(filePaths.size() - 1);
     }
 }
