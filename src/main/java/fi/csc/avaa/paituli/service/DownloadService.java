@@ -1,7 +1,7 @@
 package fi.csc.avaa.paituli.service;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
-import fi.csc.avaa.paituli.download.FileListGenerator;
+import fi.csc.avaa.paituli.download.UrlListGenerator;
 import fi.csc.avaa.paituli.download.PackageGenerator;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 
@@ -13,10 +13,10 @@ import java.util.concurrent.CompletableFuture;
 public class DownloadService {
 
     @Inject
-    PackageGenerator downloadPackageGenerator;
+    PackageGenerator packageGenerator;
 
     @Inject
-    FileListGenerator fileListGenerator;
+    UrlListGenerator urlListGenerator;
 
     @Inject
     EmailService emailService;
@@ -24,11 +24,11 @@ public class DownloadService {
     @Inject
     LogService logService;
 
-    public void download(DownloadRequest request) {
-        CompletableFuture.supplyAsync(() ->
+    public CompletableFuture<String> download(DownloadRequest request) {
+        return CompletableFuture.supplyAsync(() ->
                 request.downloadType.equals(DownloadType.ZIP)
-                        ? downloadPackageGenerator.generate(request.filePaths)
-                        : fileListGenerator.generate(request.filePaths)
+                        ? packageGenerator.generate(request.filePaths)
+                        : urlListGenerator.generate(request.filePaths)
         ).whenComplete((downloadUrl, err) -> {
             if (err != null) {
                 System.err.println("Could not generate download: " + err.getMessage());

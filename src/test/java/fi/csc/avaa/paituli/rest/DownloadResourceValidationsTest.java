@@ -4,6 +4,7 @@ import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -13,6 +14,7 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 
 @QuarkusTest
+@Tag("integration")
 public class DownloadResourceValidationsTest {
 
     @Test

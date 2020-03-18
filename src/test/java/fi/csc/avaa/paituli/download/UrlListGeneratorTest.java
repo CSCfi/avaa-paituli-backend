@@ -20,13 +20,13 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
-public class FileListGeneratorTest {
+public class UrlListGeneratorTest {
 
     @Mock
     private FileOperations fileOperations;
 
     @InjectMocks
-    private FileListGenerator generator;
+    private UrlListGenerator generator;
 
     @Captor
     ArgumentCaptor<List<String>> listCaptor;

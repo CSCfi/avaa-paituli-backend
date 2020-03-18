@@ -27,8 +27,6 @@ public class LogService {
         logEvent.saltedhash = saltedHash;
         logEvent.organization = organization;
         logEvent.dataset = request.dataId;
-        // this replicates the functionality of the old system so that we don't mess up the log table
-        // numberOfFiles = the amount of requested (not actual) paths, minus one
         logEvent.numberOfFiles = request.filePaths.size() - 1;
         logEvent.persist();
     }
