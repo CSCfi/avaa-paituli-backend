@@ -20,8 +20,8 @@ public class EmailService {
     @Inject
     ReactiveMailer mailer;
 
-    public CompletionStage<Response> sendEmail(String language, DownloadRequest request, String downloadUrl) {
-        ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(language));
+    public CompletionStage<Response> sendEmail(Locale locale, DownloadRequest request, String downloadUrl) {
+        ResourceBundle messages = ResourceBundle.getBundle("messages", locale);
         String subject = messages.getString(Constants.MESSAGE_KEY_EMAIL_SUBJECT);
         String template = messages.getString(Constants.MESSAGE_KEY_EMAIL_BODY_TEMPLATE);
 

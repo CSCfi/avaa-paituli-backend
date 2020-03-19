@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -90,7 +91,7 @@ public class DownloadServiceTest {
         Mockito.verify(generator)
                 .generate(filePaths);
         Mockito.verify(emailService)
-                .sendEmail("fi", request, downloadUrl);
+                .sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
         Mockito.verify(logService)
                 .log(request);
     }
