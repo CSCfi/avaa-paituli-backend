@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import javax.inject.Inject;
 import javax.ws.rs.core.Response;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletionStage;
@@ -39,7 +40,8 @@ public class EmailServiceTest {
         final String filename2 = "test2.zip";
         final String downloadUrl = "http://example.com/test.zip";
         final DownloadRequest request = new DownloadRequest();
-        request.filePaths = Arrays.asList(filename1, filename2);
+        request.filePaths = Collections.singletonList("test*");
+        request.filenames = Arrays.asList(filename1, filename2);
         request.email = "test@example.com";
         request.data = "Kuukauden sademäärä, 1km";
         request.org = "Ilmatieteen laitos";

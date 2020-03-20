@@ -6,7 +6,6 @@ import fi.csc.avaa.paituli.download.PackageGenerator;
 import fi.csc.avaa.paituli.download.UrlListGenerator;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.model.DownloadRequest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

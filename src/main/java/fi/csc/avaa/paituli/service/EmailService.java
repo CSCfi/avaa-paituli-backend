@@ -33,7 +33,7 @@ public class EmailService {
         if (request.coordsys != null) datasetInfo.add(request.coordsys);
         if (request.format != null) datasetInfo.add(request.format);
 
-        String filenames = "<br>" + String.join("<br>", request.filePaths) + ".";
+        String filenames = "<br>" + String.join("<br>", request.filenames) + ".";
         String body = MessageFormat.format(template, datasetInfo.toString(), filenames, downloadUrl);
 
         return mailer.send(Mail.withHtml(request.email, subject, body)).thenApply(x -> Response.accepted().build());
