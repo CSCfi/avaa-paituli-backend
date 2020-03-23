@@ -12,6 +12,7 @@ import javax.inject.Inject;
 import javax.ws.rs.core.Response;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 
@@ -47,8 +48,8 @@ public class EmailServiceTest {
         request.coordsys = "ETRS-TM35FIN";
         request.format = "TIFF";
 
-        CompletionStage<Response> completionStage = emailService.sendEmail("fi", request, downloadUrl);
-        // block
+        CompletionStage<Response> completionStage =
+                emailService.sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
         completionStage.toCompletableFuture().get();
 
         List<Mail> sent = mailbox.getMessagesSentTo(request.email);
