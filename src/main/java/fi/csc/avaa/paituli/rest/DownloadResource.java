@@ -23,7 +23,7 @@ public class DownloadResource {
 
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
-        downloadService.download(downloadRequest);
+        downloadService.generateDownload(downloadRequest);
         return Response.ok().build();
     }
 }
