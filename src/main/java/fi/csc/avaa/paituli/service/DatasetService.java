@@ -8,14 +8,17 @@ import javax.transaction.Transactional;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @ApplicationScoped
 public class DatasetService {
 
     @Transactional
     public List<LocalizedDataset> getLocalizedDatasets(Locale locale) {
-        return Dataset.<Dataset>streamAll()
-                .map(dataset -> LocalizedDataset.from(dataset, locale))
-                .collect(Collectors.toList());
+        try (Stream<Dataset> stream = Dataset.streamAll()) {
+            return stream
+                    .map(dataset -> LocalizedDataset.from(dataset, locale))
+                    .collect(Collectors.toList());
+        }
     }
 }
