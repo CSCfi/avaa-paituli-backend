@@ -21,6 +21,7 @@ public class DownloadResourceValidationsTest {
     public void shouldReturn400WithMissingEmail() {
         DownloadRequest request = new DownloadRequest();
         request.filePaths = Collections.singletonList("test");
+        request.filenames = Collections.singletonList("test");
         request.downloadType = DownloadType.ZIP;
 
         testValidationError(request, "must not be blank", "email");
@@ -30,6 +31,7 @@ public class DownloadResourceValidationsTest {
     public void shouldReturn400WithMissingFilePaths() {
         DownloadRequest request = new DownloadRequest();
         request.email = "test@example.com";
+        request.filenames = Collections.singletonList("test");
         request.downloadType = DownloadType.ZIP;
 
         testValidationError(request, "must not be empty", "filePaths");
@@ -41,6 +43,7 @@ public class DownloadResourceValidationsTest {
         request.email = "test@example.com";
         request.downloadType = DownloadType.ZIP;
         request.filePaths = Collections.emptyList();
+        request.filenames = Collections.singletonList("test");
 
         testValidationError(request, "must not be empty", "filePaths");
     }
@@ -50,8 +53,30 @@ public class DownloadResourceValidationsTest {
         DownloadRequest request = new DownloadRequest();
         request.email = "test@example.com";
         request.filePaths = Collections.singletonList("test");
+        request.filenames = Collections.singletonList("test");
 
         testValidationError(request, "must not be null", "downloadType");
+    }
+
+    @Test
+    public void shouldReturn400WithMissingFilenames() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.email = "test@example.com";
+        request.filePaths = Collections.singletonList("test");
+
+        testValidationError(request, "must not be empty", "filenames");
+    }
+
+    @Test
+    public void shouldReturn400WithEmptyFilenames() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.email = "test@example.com";
+        request.filePaths = Collections.singletonList("test");
+        request.filenames = Collections.emptyList();
+
+        testValidationError(request, "must not be empty", "filenames");
     }
 
     private void testValidationError(DownloadRequest request, String expectedMessage, String field) {

@@ -13,6 +13,8 @@ public class DownloadRequest {
     public String email;
     @NotEmpty
     public List<String> filePaths;
+    @NotEmpty
+    public List<String> filenames;
     @NotNull
     public DownloadType downloadType;
     public String org;

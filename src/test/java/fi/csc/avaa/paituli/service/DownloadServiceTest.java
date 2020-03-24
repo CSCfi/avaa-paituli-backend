@@ -1,12 +1,9 @@
 package fi.csc.avaa.paituli.service;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
-import fi.csc.avaa.paituli.download.DownloadGeneratorBase;
-import fi.csc.avaa.paituli.download.PackageGenerator;
-import fi.csc.avaa.paituli.download.UrlListGenerator;
+import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.model.DownloadRequest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,10 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class DownloadServiceTest {
 
     @Mock
-    PackageGenerator packageGenerator;
-
-    @Mock
-    UrlListGenerator urlListGenerator;
+    DownloadGenerator downloadGenerator;
 
     @Mock
     EmailService emailService;
@@ -43,12 +37,12 @@ public class DownloadServiceTest {
 
     @Test
     public void shouldCallPackageGeneratorWhenDownloadTypeIsZip() throws ExecutionException, InterruptedException {
-        verifyDownload(DownloadType.ZIP, packageGenerator);
+        verifyDownload(DownloadType.ZIP);
     }
 
     @Test
     public void shouldCallUrlListGeneratorWhenDownloadTypeIsList() throws ExecutionException, InterruptedException {
-        verifyDownload(DownloadType.LIST, urlListGenerator);
+        verifyDownload(DownloadType.LIST);
     }
 
     @Test
@@ -58,11 +52,11 @@ public class DownloadServiceTest {
         request.downloadType = DownloadType.LIST;
         request.filePaths = filePaths;
 
-        Mockito.when(urlListGenerator.generate(filePaths))
+        Mockito.when(downloadGenerator.generate(request))
                 .thenThrow(new FileOperationException(new IOException()));
 
         try {
-            service.download(request).get();
+            service.generateDownload(request).get();
         } catch (ExecutionException eex) {
             assertThat(eex.getCause())
                     .isInstanceOf(FileOperationException.class);
@@ -72,7 +66,7 @@ public class DownloadServiceTest {
         Mockito.verifyNoInteractions(logService);
     }
 
-    public void verifyDownload(DownloadType downloadType, DownloadGeneratorBase generator)
+    public void verifyDownload(DownloadType downloadType)
             throws ExecutionException, InterruptedException {
         final String downloadUrl = "https://avaa.tdata.fi/tmp/file.zip";
         final List<String> filePaths = Arrays.asList("test1.zip", "test2.zip");
@@ -80,16 +74,16 @@ public class DownloadServiceTest {
         request.downloadType = downloadType;
         request.filePaths = filePaths;
 
-        Mockito.when(generator.generate(filePaths))
+        Mockito.when(downloadGenerator.generate(request))
                 .thenReturn(downloadUrl);
 
-        CompletableFuture<String> future = service.download(request);
+        CompletableFuture<String> future = service.generateDownload(request);
         String result = future.get();
 
         assertThat(result).isEqualTo(downloadUrl);
 
-        Mockito.verify(generator)
-                .generate(filePaths);
+        Mockito.verify(downloadGenerator)
+                .generate(request);
         Mockito.verify(emailService)
                 .sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
         Mockito.verify(logService)

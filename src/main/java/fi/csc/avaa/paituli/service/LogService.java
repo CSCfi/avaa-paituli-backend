@@ -27,7 +27,7 @@ public class LogService {
         logEvent.saltedhash = saltedHash;
         logEvent.organization = organization;
         logEvent.dataset = request.dataId;
-        logEvent.numberOfFiles = request.filePaths.size() - 1;
+        logEvent.numberOfFiles = request.filenames.size() - 1;
         logEvent.persist();
     }
 

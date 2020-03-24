@@ -3,6 +3,7 @@ package fi.csc.avaa.paituli.download;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.model.DownloadRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,13 +21,13 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
-public class UrlListGeneratorTest {
+public class DownloadGeneratorTest {
 
     @Mock
     private FileOperations fileOperations;
 
     @InjectMocks
-    private UrlListGenerator generator;
+    private DownloadGenerator generator;
 
     @Captor
     ArgumentCaptor<List<String>> listCaptor;
@@ -51,9 +52,43 @@ public class UrlListGeneratorTest {
     }
 
     @Test
+    public void fileShouldBePackagedToOutputFile() {
+        final String filePath = "file.zip";
+        final List<String> filePaths = Collections.singletonList(filePath);
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = filePaths;
+
+        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
+                .thenReturn(true);
+
+        String downloadUrl = generator.generate(request);
+
+        assertThat(downloadUrl)
+                .startsWith(downloadUrlPrefix)
+                .endsWith(DownloadType.ZIP.getExtension());
+
+        Mockito.verify(fileOperations)
+                .fileExists(absolutePathFor(filePath));
+        Mockito.verify(fileOperations)
+                .packageFiles(listCaptor.capture(), stringCaptor.capture());
+
+        assertThat(listCaptor.getValue())
+                .hasSize(1)
+                .contains(absolutePathFor(filePath));
+        assertThat(stringCaptor.getValue())
+                .startsWith(outputPath + "/" + filePrefix)
+                .endsWith(DownloadType.ZIP.getExtension());
+    }
+
+
+    @Test
     public void fileFtpUrlShouldBeWrittenToOutput() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.LIST;
+        request.filePaths = filePaths;
 
         String absolutePath = absolutePathFor(filePath);
         String ftpUrl = ftpUrlFor(absolutePath);
@@ -61,7 +96,7 @@ public class UrlListGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePath))
                 .thenReturn(true);
 
-        String downloadUrl = generator.generate(filePaths);
+        String downloadUrl = generator.generate(request);
 
         assertThat(downloadUrl)
                 .startsWith(downloadUrlPrefix)
@@ -81,91 +116,21 @@ public class UrlListGeneratorTest {
     }
 
     @Test
-    public void nonExistingFileShouldNotCauseException() {
-        final String filePath1 = "file.zip";
-        final String filePath2 = "doesnotexist.zip";
-        final List<String> filePaths = Arrays.asList(filePath1, filePath2);
-
-        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath1)))
-                .thenReturn(true);
-        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
-                .thenReturn(false);
-
-        String downloadUrl = generator.generate(filePaths);
-
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
-                .endsWith(DownloadType.LIST.getExtension());
-
-        Mockito.verify(fileOperations)
-                .fileExists(absolutePathFor(filePath1));
-        Mockito.verify(fileOperations)
-                .fileExists(absolutePathFor(filePath2));
-        Mockito.verify(fileOperations)
-                .writeUrlList(listCaptor.capture(), stringCaptor.capture());
-
-        assertThat(listCaptor.getValue())
-                .hasSize(1)
-                .contains(ftpUrlFor(absolutePathFor(filePath1)));
-        assertThat(stringCaptor.getValue())
-                .startsWith(outputPath + "/" + filePrefix)
-                .endsWith(DownloadType.LIST.getExtension());
-    }
-
-    @Test
-    public void wildcardFilePathsShouldBeExpanded() {
-        final String normalFilePath = "normal.zip";
-        final String wildcardFilePath = "file*.zip";
-        final List<String> filePaths = Arrays.asList(normalFilePath, wildcardFilePath);
-        final String wildcardFilePathAsRegex = "file.*\\.zip";
-        final List<String> matchingFiles = Arrays.asList(
-                absolutePathFor("file1.zip"),
-                absolutePathFor("file2.zip")
-        );
-
-        Mockito.when(fileOperations.fileExists(absolutePathFor(normalFilePath)))
-                .thenReturn(true);
-        Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
-                .thenReturn(matchingFiles);
-
-        String downloadUrl = generator.generate(filePaths);
-
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
-                .endsWith(DownloadType.LIST.getExtension());
-
-        Mockito.verify(fileOperations)
-                .fileExists(absolutePathFor(normalFilePath));
-        Mockito.verify(fileOperations)
-                .findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex);
-        Mockito.verify(fileOperations)
-                .writeUrlList(listCaptor.capture(), stringCaptor.capture());
-
-        assertThat(listCaptor.getValue())
-                .hasSize(3)
-                .contains(
-                        ftpUrlFor(absolutePathFor(normalFilePath)),
-                        ftpUrlFor(matchingFiles.get(0)),
-                        ftpUrlFor(matchingFiles.get(1)));
-        assertThat(stringCaptor.getValue())
-                .startsWith(outputPath + "/" + filePrefix)
-                .endsWith(DownloadType.LIST.getExtension());
-    }
-
-    @Test
     public void ftpUrlsShouldBeSortedAlphabetically() {
         final String filePathD = "d.zip";
         final String filePathA = "a.zip";
         final String wildcardFilePath = "*.zip";
         final List<String> filePaths = Arrays.asList(filePathD, filePathA, wildcardFilePath);
         final String wildcardFilePathAsRegex = ".*\\.zip";
-
         final String filePathC = "c.zip";
         final String filePathB = "b.zip";
         final List<String> matchingFiles = Arrays.asList(
                 absolutePathFor(filePathC),
                 absolutePathFor(filePathB)
         );
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.LIST;
+        request.filePaths = filePaths;
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePathD)))
                 .thenReturn(true);
@@ -174,7 +139,7 @@ public class UrlListGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        String downloadUrl = generator.generate(filePaths);
+        String downloadUrl = generator.generate(request);
 
         assertThat(downloadUrl)
                 .startsWith(downloadUrlPrefix)
@@ -201,15 +166,97 @@ public class UrlListGeneratorTest {
     }
 
     @Test
+    public void nonExistingFileShouldNotCauseExceptionIfAnyOtherFilesAreFound() {
+        final String filePath1 = "file.zip";
+        final String filePath2 = "doesnotexist.zip";
+        final List<String> filePaths = Arrays.asList(filePath1, filePath2);
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = filePaths;
+
+        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath1)))
+                .thenReturn(true);
+        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
+                .thenReturn(false);
+
+        String downloadUrl = generator.generate(request);
+
+        assertThat(downloadUrl)
+                .startsWith(downloadUrlPrefix)
+                .endsWith(DownloadType.ZIP.getExtension());
+
+        Mockito.verify(fileOperations)
+                .fileExists(absolutePathFor(filePath1));
+        Mockito.verify(fileOperations)
+                .fileExists(absolutePathFor(filePath2));
+        Mockito.verify(fileOperations)
+                .packageFiles(listCaptor.capture(), stringCaptor.capture());
+
+        assertThat(listCaptor.getValue())
+                .hasSize(1)
+                .contains(absolutePathFor(filePath1));
+        assertThat(stringCaptor.getValue())
+                .startsWith(outputPath + "/" + filePrefix)
+                .endsWith(DownloadType.ZIP.getExtension());
+    }
+
+    @Test
+    public void wildcardFilePathsShouldBeExpanded() {
+        final String normalFilePath = "normal.zip";
+        final String wildcardFilePath = "file*.zip";
+        final List<String> filePaths = Arrays.asList(normalFilePath, wildcardFilePath);
+        final String wildcardFilePathAsRegex = "file.*\\.zip";
+        final List<String> matchingFiles = Arrays.asList(
+                absolutePathFor("file1.zip"),
+                absolutePathFor("file2.zip")
+        );
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = filePaths;
+
+        Mockito.when(fileOperations.fileExists(absolutePathFor(normalFilePath)))
+                .thenReturn(true);
+        Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
+                .thenReturn(matchingFiles);
+
+        String downloadUrl = generator.generate(request);
+
+        assertThat(downloadUrl)
+                .startsWith(downloadUrlPrefix)
+                .endsWith(DownloadType.ZIP.getExtension());
+
+        Mockito.verify(fileOperations)
+                .fileExists(absolutePathFor(normalFilePath));
+        Mockito.verify(fileOperations)
+                .findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex);
+        Mockito.verify(fileOperations)
+                .packageFiles(listCaptor.capture(), stringCaptor.capture());
+
+        assertThat(listCaptor.getValue())
+                .hasSize(3)
+                .contains(
+                        absolutePathFor(normalFilePath),
+                        matchingFiles.get(0),
+                        matchingFiles.get(1)
+                );
+        assertThat(stringCaptor.getValue())
+                .startsWith(outputPath + "/" + filePrefix)
+                .endsWith(DownloadType.ZIP.getExtension());
+    }
+
+    @Test
     public void shouldThrowExceptionWhenNoFilesAreFound() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = filePaths;
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
-            generator.generate(filePaths);
+            generator.generate(request);
         });
     }
 
@@ -218,12 +265,15 @@ public class UrlListGeneratorTest {
         final String wildcardFilePath = "file*.zip";
         final List<String> filePaths = Collections.singletonList(wildcardFilePath);
         final String wildcardFilePathAsRegex = "file.*\\.zip";
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = filePaths;
 
         Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
                 .thenThrow(new FileOperationException(new IOException()));
 
         Assertions.assertThrows(FileOperationException.class, () -> {
-            generator.generate(filePaths);
+            generator.generate(request);
         });
     }
 
@@ -231,14 +281,17 @@ public class UrlListGeneratorTest {
     public void exceptionsInWritingOutputShouldBePropagated() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = filePaths;
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(true);
         Mockito.doThrow(new FileOperationException(new IOException()))
-                .when(fileOperations).writeUrlList(anyList(), anyString());
+                .when(fileOperations).packageFiles(anyList(), anyString());
 
         Assertions.assertThrows(FileOperationException.class, () -> {
-            generator.generate(filePaths);
+            generator.generate(request);
         });
     }
 

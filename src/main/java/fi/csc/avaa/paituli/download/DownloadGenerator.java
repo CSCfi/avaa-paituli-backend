@@ -2,15 +2,18 @@ package fi.csc.avaa.paituli.download;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.model.DownloadRequest;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-public abstract class DownloadGeneratorBase {
+@ApplicationScoped
+public class DownloadGenerator {
 
     @Inject
     FileOperations fileOperations;
@@ -24,27 +27,50 @@ public abstract class DownloadGeneratorBase {
     @ConfigProperty(name = "paituli.download.outputBaseUrl")
     String outputBaseUrl;
 
+    @ConfigProperty(name = "paituli.download.ftpBaseUrl")
+    String ftpBaseUrl;
+
     @ConfigProperty(name = "paituli.download.filePrefix")
     String filePrefix;
 
-    public abstract String generate(List<String> filePaths);
+    public String generate(DownloadRequest request) {
+        return request.downloadType.equals(DownloadType.ZIP)
+                ? generatePackage(request.filePaths)
+                : generateUrlList(request.filePaths);
+    }
 
-    String getOutputFilename(DownloadType type) {
+    private String generatePackage(List<String> filePaths) {
+        List<String> absolutePaths = collectAbsolutePaths(filePaths);
+        String outputFileName = getOutputFilename(DownloadType.ZIP);
+        String outputFilePath = getOutputFilePath(outputFileName);
+        fileOperations.packageFiles(absolutePaths, outputFilePath);
+        return getDownloadUrl(outputFileName);
+    }
+
+    private String generateUrlList(List<String> filePaths) {
+        List<String> ftpUrls = collectFtpUrls(filePaths);
+        String outputFileName = getOutputFilename(DownloadType.LIST);
+        String outputFilePath = getOutputFilePath(outputFileName);
+        fileOperations.writeUrlList(ftpUrls, outputFilePath);
+        return getDownloadUrl(outputFileName);
+    }
+
+    private String getOutputFilename(DownloadType type) {
         String randomNumbers = new Random().ints(8, 0, 10)
                 .mapToObj(String::valueOf)
                 .collect(Collectors.joining());
         return String.format("%s%s.%s", filePrefix, randomNumbers, type.getExtension());
     }
 
-    String getOutputFilePath(String filename) {
+    private String getOutputFilePath(String filename) {
         return String.format("%s/%s", outputPath, filename);
     }
 
-    String getDownloadUrl(String outputFilename) {
+    private String getDownloadUrl(String outputFilename) {
         return String.format("%s/%s", outputBaseUrl, outputFilename);
     }
 
-    List<String> collectAbsolutePaths(List<String> filePaths) {
+    private List<String> collectAbsolutePaths(List<String> filePaths) {
         List<String> absolutePaths = new ArrayList<>();
         filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s/%s", inputPath, filePath);
@@ -62,6 +88,14 @@ public abstract class DownloadGeneratorBase {
             throw new IllegalArgumentException("There were no existing files listed in the filename list");
         }
         return absolutePaths;
+    }
+
+    private List<String> collectFtpUrls(List<String> filePaths) {
+        return collectAbsolutePaths(filePaths)
+                .stream()
+                .sorted()
+                .map(absolutePath -> String.format("%s%s", ftpBaseUrl, absolutePath))
+                .collect(Collectors.toList());
     }
 
     private List<String> findMatchingFiles(String absolutePath) {
