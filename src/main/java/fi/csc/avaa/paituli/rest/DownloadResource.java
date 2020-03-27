@@ -12,6 +12,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.Map;
 
 @Path(Constants.PATH_DOWNLOAD)
 @Produces(MediaType.APPLICATION_JSON)
@@ -24,6 +25,8 @@ public class DownloadResource {
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
         downloadService.generateDownload(downloadRequest);
-        return Response.ok().build();
+        return Response
+                .ok(Map.of("success", true))
+                .build();
     }
 }
