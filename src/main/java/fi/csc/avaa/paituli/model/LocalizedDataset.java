@@ -18,6 +18,7 @@ public class LocalizedDataset {
     public String coord_sys;
     public Integer map_sheets;
     public Integer file_size;
+    public String data_url;
     public Boolean queries;
     public String meta;
     public Integer access;
@@ -44,6 +45,7 @@ public class LocalizedDataset {
         localized.coord_sys = dataset.coord_sys;
         localized.map_sheets = dataset.map_sheets;
         localized.file_size = dataset.file_size;
+        localized.data_url = dataset.data_url;
         localized.queries = dataset.queries;
         localized.meta = dataset.meta;
         localized.access = dataset.access;
