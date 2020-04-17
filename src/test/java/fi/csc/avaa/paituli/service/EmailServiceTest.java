@@ -1,5 +1,6 @@
 package fi.csc.avaa.paituli.service;
 
+import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.mailer.Mail;
@@ -35,7 +36,26 @@ public class EmailServiceTest {
     }
 
     @Test
-    public void shouldSendPackageEmailWithFilledTemplate() throws ExecutionException, InterruptedException {
+    public void shouldSendPackageEmailWithFilledTemplateFi() throws ExecutionException, InterruptedException {
+        verifyPackageEmail("fi");
+    }
+
+    @Test
+    public void shouldSendPackageEmailWithFilledTemplateEn() throws ExecutionException, InterruptedException {
+        verifyPackageEmail("en");
+    }
+
+    @Test
+    public void shouldSendUrlListEmailWithFilledTemplateFi() throws ExecutionException, InterruptedException {
+        verifyUrlListEmail("fi");
+    }
+
+    @Test
+    public void shouldSendUrlListEmailWithFilledTemplateEn() throws ExecutionException, InterruptedException {
+        verifyUrlListEmail("en");
+    }
+
+    private void verifyPackageEmail(String languageTag) throws ExecutionException, InterruptedException {
         final String filename1 = "test1.zip";
         final String filename2 = "test2.zip";
         final String downloadUrl = "http://example.com/test.zip";
@@ -43,6 +63,7 @@ public class EmailServiceTest {
         request.downloadType = DownloadType.ZIP;
         request.filenames = Arrays.asList(filename1, filename2);
         request.email = "test@example.com";
+        request.locale = languageTag;
         request.data = "Kuukauden sademäärä, 1km";
         request.org = "Ilmatieteen laitos";
         request.year = "1961-2014";
@@ -50,18 +71,21 @@ public class EmailServiceTest {
         request.coordsys = "ETRS-TM35FIN";
         request.format = "TIFF";
 
-        CompletionStage<Response> completionStage =
-                emailService.sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
+        CompletionStage<Response> completionStage = emailService.sendEmail(request, downloadUrl);
         completionStage.toCompletableFuture().get();
 
         List<Mail> sent = mailbox.getMessagesSentTo(request.email);
         assertThat(sent).hasSize(1);
         Mail mail = sent.get(0);
+        boolean isLocaleFi = Locale.forLanguageTag(languageTag).equals(Constants.LOCALE_FI);
         assertThat(mail.getTo())
                 .hasSize(1)
                 .contains(request.email);
+        assertThat(mail.getSubject())
+                .contains(isLocaleFi ? "lataustiedosto on valmiina" : "data download is available");
         assertThat(mail.getHtml())
-                .contains(request.data,
+                .contains(isLocaleFi ? "Ladattava aineisto" : "You have ordered",
+                        request.data,
                         request.year,
                         request.org,
                         request.year,
@@ -73,12 +97,12 @@ public class EmailServiceTest {
                         downloadUrl);
     }
 
-    @Test
-    public void shouldSendUrlListEmailWithFilledTemplate() throws ExecutionException, InterruptedException {
+    private void verifyUrlListEmail(String languageTag) throws ExecutionException, InterruptedException {
         final String downloadUrl = "http://example.com/test.zip";
         final DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.LIST;
         request.email = "test@example.com";
+        request.locale = languageTag;
         request.data = "Kuukauden sademäärä, 1km";
         request.org = "Ilmatieteen laitos";
         request.year = "1961-2014";
@@ -86,18 +110,21 @@ public class EmailServiceTest {
         request.coordsys = "ETRS-TM35FIN";
         request.format = "TIFF";
 
-        CompletionStage<Response> completionStage =
-                emailService.sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
+        CompletionStage<Response> completionStage = emailService.sendEmail(request, downloadUrl);
         completionStage.toCompletableFuture().get();
 
         List<Mail> sent = mailbox.getMessagesSentTo(request.email);
         assertThat(sent).hasSize(1);
         Mail mail = sent.get(0);
+        boolean isLocaleFi = Locale.forLanguageTag(languageTag).equals(Constants.LOCALE_FI);
         assertThat(mail.getTo())
                 .hasSize(1)
                 .contains(request.email);
+        assertThat(mail.getSubject())
+                .contains(isLocaleFi ? "tiedostolista on valmiina" : "data download is available");
         assertThat(mail.getHtml())
-                .contains(request.data,
+                .contains(isLocaleFi ? "Ladattava aineisto" : "You have ordered",
+                        request.data,
                         request.year,
                         request.org,
                         request.year,

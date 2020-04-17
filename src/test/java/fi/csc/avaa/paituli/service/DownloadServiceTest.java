@@ -85,7 +85,7 @@ public class DownloadServiceTest {
         Mockito.verify(downloadGenerator)
                 .generate(request);
         Mockito.verify(emailService)
-                .sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
+                .sendEmail(request, downloadUrl);
         Mockito.verify(logService)
                 .log(request);
     }

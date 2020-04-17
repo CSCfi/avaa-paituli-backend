@@ -26,7 +26,7 @@ public class DownloadService {
                     if (err != null) {
                         System.err.println("Could not generate download: " + err.getMessage());
                     } else {
-                        emailService.sendEmail(Locale.forLanguageTag("fi"), request, downloadUrl);
+                        emailService.sendEmail(request, downloadUrl);
                         logService.log(request);
                     }
                 });
