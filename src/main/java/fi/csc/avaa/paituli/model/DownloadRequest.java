@@ -17,6 +17,8 @@ public class DownloadRequest {
     public List<String> filenames;
     @NotNull
     public DownloadType downloadType;
+    @NotNull
+    public String locale;
     public String org;
     public String data;
     public String scale;

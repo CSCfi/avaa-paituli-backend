@@ -22,7 +22,7 @@ public class EmailService {
     @Inject
     ReactiveMailer mailer;
 
-    public CompletionStage<Response> sendEmail(Locale locale, DownloadRequest request, String downloadUrl) {
+    public CompletionStage<Response> sendEmail(DownloadRequest request, String downloadUrl) {
         StringJoiner datasetInfo = new StringJoiner(", ");
         if (request.org != null) datasetInfo.add(request.org);
         if (request.data != null) datasetInfo.add(request.data);
@@ -31,7 +31,7 @@ public class EmailService {
         if (request.coordsys != null) datasetInfo.add(request.coordsys);
         if (request.format != null) datasetInfo.add(request.format);
 
-        ResourceBundle messages = ResourceBundle.getBundle("messages", locale);
+        ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(request.locale));
         Mail mail = request.downloadType.equals(DownloadType.ZIP)
                 ? getPackageMail(request, downloadUrl, datasetInfo, messages)
                 : getUrlListMail(request, downloadUrl, datasetInfo, messages);
