@@ -1,9 +1,9 @@
 package fi.csc.avaa.paituli.model;
 
+import java.util.Locale;
+
 import fi.csc.avaa.paituli.constants.Constants;
 import fi.csc.avaa.paituli.entity.Dataset;
-
-import java.util.Locale;
 
 public class LocalizedDataset {
 
@@ -24,6 +24,7 @@ public class LocalizedDataset {
     public Integer access;
     public String license_url;
     public String funet;
+    public Integer data_max_scale;
 
     public static LocalizedDataset from(Dataset dataset, Locale locale) {
         boolean isLocaleFi = locale.equals(Constants.LOCALE_FI);
@@ -51,6 +52,7 @@ public class LocalizedDataset {
         localized.access = dataset.access;
         localized.license_url = dataset.license_url;
         localized.funet = dataset.funet;
+        localized.data_max_scale = dataset.data_max_scale;
         return localized;
     }
 }
