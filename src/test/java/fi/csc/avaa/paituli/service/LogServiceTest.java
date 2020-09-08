@@ -45,7 +45,7 @@ public class LogServiceTest {
         LogEvent event = events.get(0);
         assertThat(event.timestamp).isNotNull();
         assertThat(event.saltedhash).isNotEqualTo(email);
-        assertThat(event.data_id).isEqualTo(dataId);
+        assertThat(event.dataset).isEqualTo(dataId);
         assertThat(event.organization).isEqualTo(expectedOrganization);
         assertThat(event.numberOfFiles).isEqualTo(filenames.size() - 1);
     }
