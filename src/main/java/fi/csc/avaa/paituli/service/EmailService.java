@@ -35,7 +35,6 @@ public class EmailService {
         Mail mail = request.downloadType.equals(DownloadType.ZIP)
                 ? getPackageMail(request, downloadUrl, datasetInfo, messages)
                 : getUrlListMail(request, downloadUrl, datasetInfo, messages);
-        System.out.println("Sending mail from "+ mail.getFrom() + " to " + mail.getTo());
         return mailer.send(mail)
                 .subscribeAsCompletionStage()
                 .thenApply(x -> Response.accepted().build());
@@ -50,7 +49,7 @@ public class EmailService {
                 .sorted()
                 .collect(Collectors.joining("<br>", "<br>", "."));
         String body = MessageFormat.format(template, datasetInfo, filenames, downloadUrl);
-        return Mail.withHtml(request.email, subject, body);
+        return Mail.withHtml("johannes.nyman@csc.fi", subject, body);
     }
 
     private Mail getUrlListMail(DownloadRequest request, String downloadUrl, StringJoiner datasetInfo,
