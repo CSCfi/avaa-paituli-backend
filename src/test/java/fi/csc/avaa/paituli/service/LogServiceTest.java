@@ -31,11 +31,11 @@ public class LogServiceTest {
     public void logEventShouldBePersisted() {
         final String email = "test@example.com";
         final List<String> filenames = Arrays.asList("test1.zip", "test2.zip");
-        final String dataId = "il_sade_1km_1991_tiff_euref";
+        final String data_id = "il_sade_1km_1991_tiff_euref";
         final DownloadRequest request = new DownloadRequest();
         request.email = email;
         request.filenames = filenames;
-        request.dataId = dataId;
+        request.data_id = data_id;
         final String expectedOrganization = "example.com";
 
         service.log(request);
@@ -45,7 +45,7 @@ public class LogServiceTest {
         LogEvent event = events.get(0);
         assertThat(event.timestamp).isNotNull();
         assertThat(event.saltedhash).isNotEqualTo(email);
-        assertThat(event.dataset).isEqualTo(dataId);
+        assertThat(event.dataset).isEqualTo(data_id);
         assertThat(event.organization).isEqualTo(expectedOrganization);
         assertThat(event.numberOfFiles).isEqualTo(filenames.size() - 1);
     }
