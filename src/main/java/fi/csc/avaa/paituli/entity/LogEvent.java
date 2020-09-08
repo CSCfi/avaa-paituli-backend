@@ -10,8 +10,8 @@ import java.util.Date;
 public class LogEvent extends PanacheEntityBase {
     @Id
     @Column(name = "event_id", updatable = false, nullable = false)
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "id_seq")
     @SequenceGenerator(name = "id_seq", sequenceName = "event_id_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "id_seq")
     public Integer id;
     @Column(length = 256)
     public String saltedhash;
