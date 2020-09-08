@@ -27,7 +27,7 @@ public class DownloadService {
                         System.err.println("Could not generate download: " + err.getMessage());
                     } else {
                         emailService.sendEmail(request, downloadUrl);
-                        // logService.log(request);
+                        logService.log(request);
                     }
                 });
     }
