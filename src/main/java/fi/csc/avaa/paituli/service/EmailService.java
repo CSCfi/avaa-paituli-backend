@@ -35,7 +35,7 @@ public class EmailService {
         Mail mail = request.downloadType.equals(DownloadType.ZIP)
                 ? getPackageMail(request, downloadUrl, datasetInfo, messages)
                 : getUrlListMail(request, downloadUrl, datasetInfo, messages);
-        System.out.println(mail);
+        System.out.println("Sending mail from "+ mail.getFrom() + " to " + mail.getTo());
         return mailer.send(mail)
                 .subscribeAsCompletionStage()
                 .thenApply(x -> Response.accepted().build());
