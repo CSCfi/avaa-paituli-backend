@@ -49,7 +49,7 @@ public class EmailService {
                 .sorted()
                 .collect(Collectors.joining("<br>", "<br>", "."));
         String body = MessageFormat.format(template, datasetInfo, filenames, downloadUrl);
-        return Mail.withHtml("johannes.nyman@csc.fi", subject, body);
+        return Mail.withHtml(request.email, subject, body);
     }
 
     private Mail getUrlListMail(DownloadRequest request, String downloadUrl, StringJoiner datasetInfo,
