@@ -18,7 +18,7 @@ public class LogEvent extends PanacheEntityBase {
     @Column(name = "organisaatio", length = 100)
     public String organization;
     @Column(name = "aineisto", length = 256)
-    public String dataset;
+    public String data_id;
     @Column(name = "tiedotojenlkm")
     public Integer numberOfFiles;
     @Column(name = "paiva")
