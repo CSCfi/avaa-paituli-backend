@@ -25,5 +25,5 @@ public class DownloadRequest {
     public String year;
     public String coordsys;
     public String format;
-    public String dataId;
+    public String data_id;
 }
