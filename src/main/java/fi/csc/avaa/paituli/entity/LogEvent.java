@@ -23,4 +23,6 @@ public class LogEvent extends PanacheEntityBase {
     public Integer numberOfFiles;
     @Column(name = "paiva")
     public Date timestamp;
+    @Column(name = "type")
+    public Integer downloadType;
 }
