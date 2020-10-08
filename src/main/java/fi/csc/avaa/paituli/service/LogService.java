@@ -23,14 +23,13 @@ public class LogService {
     public void log(DownloadRequest request) {
         String organization = request.email.substring(request.email.indexOf('@') + 1);
         String saltedHash = hash(request.email);
-        Integer downloadTypeNumber = convertDownloadType(request.downloadType);
         LogEvent logEvent = new LogEvent();
         logEvent.timestamp = new Date();
         logEvent.saltedhash = saltedHash;
         logEvent.organization = organization;
         logEvent.dataset = request.data_id;
         logEvent.numberOfFiles = request.filenames.size() - 1;
-        logEvent.downloadType = downloadTypeNumber;
+        logEvent.downloadType = 3;
         // logEvent.downloadType = request.downloadType.returnTypeNumber();
         logEvent.persist();
     }
