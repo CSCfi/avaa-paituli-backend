@@ -30,17 +30,21 @@ public class LogService {
         logEvent.dataset = request.data_id;
         logEvent.numberOfFiles = request.filenames.size() - 1;
         logEvent.downloadType = 3;
-        // logEvent.downloadType = request.downloadType.returnTypeNumber();
+        logEvent.downloadType = convertDownloadType(request.downloadType);
         logEvent.persist();
     }
 
     public Integer convertDownloadType(DownloadType type) {
-        if (type.equals(DownloadType.ZIP)) {
-                return 1;
-        }
-        else { 
-            return 2;
-        }
+        try {
+            return type.equals(DownloadType.ZIP)
+                    ? 1
+                    : 2;
+            }
+            catch (Exception e) {
+                System.err.println(type);
+                System.err.println(DownloadType.ZIP);
+            }
+
     }
 
     private String hash(String s) {
