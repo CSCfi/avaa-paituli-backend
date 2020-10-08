@@ -42,7 +42,6 @@ public class LogService {
         else { 
             return 2;
         }
-    
     }
 
     private String hash(String s) {
