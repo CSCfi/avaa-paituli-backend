@@ -23,7 +23,6 @@ public class LogService {
     public void log(DownloadRequest request) {
         String organization = request.email.substring(request.email.indexOf('@') + 1);
         String saltedHash = hash(request.email);
-        // Integer downloadTypeNumber = convertDownloadType(request.downloadType);
         LogEvent logEvent = new LogEvent();
         logEvent.timestamp = new Date();
         logEvent.saltedhash = saltedHash;
@@ -42,7 +41,6 @@ public class LogService {
         else { 
             return 2;
         }
-    
     }
 
     private String hash(String s) {
