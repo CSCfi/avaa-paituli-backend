@@ -29,7 +29,7 @@ public class LogService {
         logEvent.organization = organization;
         logEvent.dataset = request.data_id;
         logEvent.numberOfFiles = request.filenames.size() - 1;
-        logEvent.downloadType = 3;
+        // logEvent.downloadType = 3;
         logEvent.downloadType = convertDownloadType(request.downloadType);
         logEvent.persist();
     }
