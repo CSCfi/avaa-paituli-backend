@@ -44,7 +44,7 @@ public class LogService {
                 System.err.println(type);
                 System.err.println(DownloadType.ZIP);
             }
-
+        return 3;
     }
 
     private String hash(String s) {
