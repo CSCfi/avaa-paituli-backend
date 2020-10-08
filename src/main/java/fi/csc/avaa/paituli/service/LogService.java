@@ -36,9 +36,12 @@ public class LogService {
     }
 
     public Integer convertDownloadType(DownloadType type) {
-        return type.equals(DownloadType.ZIP)
-                ? 1
-                : 2;
+        if (type.equals(DownloadType.ZIP)) {
+                return 1;
+        }
+        else { 
+            return 2;
+        }
     }
 
     private String hash(String s) {
