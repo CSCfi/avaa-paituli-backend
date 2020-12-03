@@ -17,7 +17,7 @@ public class DatasetService {
     public List<LocalizedDataset> getLocalizedDatasets(Locale locale) {
         try (Stream<Dataset> stream = Dataset.streamAll()) {
             return stream
-                    .filter(dataset -> dataset.getAccess() != 5)
+                    .filter(dataset -> dataset.getAccess() == 1)
                     .map(dataset -> LocalizedDataset.from(dataset, locale))
                     .collect(Collectors.toList());
         }
