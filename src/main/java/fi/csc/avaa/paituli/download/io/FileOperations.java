@@ -22,8 +22,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import org.jboss.logging.Logger;
+
 @ApplicationScoped
 public class FileOperations {
+
+    private static final Logger LOG = Logger.getLogger(FileOperations.class);
 
     @ConfigProperty(name = "paituli.download.inputPath")
     String inputPath;
@@ -73,11 +77,13 @@ public class FileOperations {
     }
 
     private void copyDirectoryToZip(String absolutePath, ZipOutputStream zout)  {
+        LOG.info("copyDirectoryToZip: " + absolutePath);
         try (Stream<Path> subPaths = Files.list(Paths.get(absolutePath))) {
             subPaths
                     .map(Path::toAbsolutePath)
                     .forEach(subPath -> {
                         if (Files.isDirectory(subPath)) {
+                            LOG.info(subPath.toString());
                             copyDirectoryToZip(subPath.toString(), zout);
                         } else {
                             copyFileToZip(subPath.toString(), zout);

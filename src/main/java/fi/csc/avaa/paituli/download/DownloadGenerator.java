@@ -91,7 +91,6 @@ public class DownloadGenerator {
         if (absolutePaths.isEmpty()) {
             throw new IllegalArgumentException("There were no existing files listed in the filename list");
         }
-        LOG.info("AbsolutePaths: " + absolutePaths);
         return absolutePaths;
     }
 
