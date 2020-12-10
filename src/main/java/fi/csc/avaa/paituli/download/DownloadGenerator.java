@@ -106,7 +106,6 @@ public class DownloadGenerator {
         int lastSeparatorIndex = absolutePath.lastIndexOf('/');
         String basePath = absolutePath.substring(0, lastSeparatorIndex);
         String regex = toRegex(absolutePath.substring(lastSeparatorIndex + 1));
-        LOG.info(fileOperations.findFilenamesMatchingRegex(basePath, regex));
         return fileOperations.findFilenamesMatchingRegex(basePath, regex);
     }
 
