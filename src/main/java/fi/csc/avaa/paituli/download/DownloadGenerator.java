@@ -78,7 +78,6 @@ public class DownloadGenerator {
         List<String> absolutePaths = new ArrayList<>();
         filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s/%s", inputPath, filePath);
-            LOG.info(inputPath + ", " + filePath + ", " +  absolutePath);
             if (absolutePath.contains("*")) {
                 absolutePaths.addAll(findMatchingFiles(absolutePath));
             } else {
@@ -107,6 +106,7 @@ public class DownloadGenerator {
         int lastSeparatorIndex = absolutePath.lastIndexOf('/');
         String basePath = absolutePath.substring(0, lastSeparatorIndex);
         String regex = toRegex(absolutePath.substring(lastSeparatorIndex + 1));
+        LOG.info("findMatchingFiles function: " + basePath);
         return fileOperations.findFilenamesMatchingRegex(basePath, regex);
     }
 
