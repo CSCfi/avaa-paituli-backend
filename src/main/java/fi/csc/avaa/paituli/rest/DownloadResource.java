@@ -19,6 +19,7 @@ import java.util.Map;
 @Consumes(MediaType.APPLICATION_JSON)
 public class DownloadResource {
 
+
     @Inject
     DownloadService downloadService;
 

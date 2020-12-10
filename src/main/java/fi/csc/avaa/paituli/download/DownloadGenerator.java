@@ -12,8 +12,12 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.jboss.logging.Logger;
+
 @ApplicationScoped
 public class DownloadGenerator {
+
+    private static final Logger LOG = Logger.getLogger(DownloadGenerator.class);
 
     @Inject
     FileOperations fileOperations;
@@ -74,6 +78,7 @@ public class DownloadGenerator {
         List<String> absolutePaths = new ArrayList<>();
         filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s/%s", inputPath, filePath);
+            LOG.info(inputPath, filePath, absolutePath);
             if (absolutePath.contains("*")) {
                 absolutePaths.addAll(findMatchingFiles(absolutePath));
             } else {
