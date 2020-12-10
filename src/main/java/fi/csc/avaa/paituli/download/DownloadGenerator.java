@@ -91,6 +91,7 @@ public class DownloadGenerator {
         if (absolutePaths.isEmpty()) {
             throw new IllegalArgumentException("There were no existing files listed in the filename list");
         }
+        LOG.info("AbsolutePaths: " + absolutePaths);
         return absolutePaths;
     }
 
@@ -106,7 +107,7 @@ public class DownloadGenerator {
         int lastSeparatorIndex = absolutePath.lastIndexOf('/');
         String basePath = absolutePath.substring(0, lastSeparatorIndex);
         String regex = toRegex(absolutePath.substring(lastSeparatorIndex + 1));
-        LOG.info("findMatchingFiles function: " + basePath);
+        LOG.info(fileOperations.findFilenamesMatchingRegex(basePath, regex));
         return fileOperations.findFilenamesMatchingRegex(basePath, regex);
     }
 
