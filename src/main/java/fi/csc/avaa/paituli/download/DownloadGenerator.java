@@ -78,7 +78,7 @@ public class DownloadGenerator {
         List<String> absolutePaths = new ArrayList<>();
         filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s/%s", inputPath, filePath);
-            LOG.info(inputPath, filePath, absolutePath);
+            LOG.info(inputPath + ", " + filePath + ", " +  absolutePath);
             if (absolutePath.contains("*")) {
                 absolutePaths.addAll(findMatchingFiles(absolutePath));
             } else {
