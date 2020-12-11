@@ -77,13 +77,11 @@ public class FileOperations {
     }
 
     private void copyDirectoryToZip(String absolutePath, ZipOutputStream zout)  {
-        LOG.info("copyDirectoryToZip: " + absolutePath);
         try (Stream<Path> subPaths = Files.list(Paths.get(absolutePath))) {
             subPaths
                     .map(Path::toAbsolutePath)
                     .forEach(subPath -> {
                         if (Files.isDirectory(subPath)) {
-                            LOG.info(subPath.toString());
                             copyDirectoryToZip(subPath.toString(), zout);
                         } else {
                             copyFileToZip(subPath.toString(), zout);
@@ -127,6 +125,7 @@ public class FileOperations {
                 : Deflater.BEST_COMPRESSION;
         zout.setLevel(compressionLevel);
         try {
+            LOG.info("CopyRegularFileToZIp: " + absolutePath);
             zout.putNextEntry(new ZipEntry(zipEntryNameFor(absolutePath)));
             Files.copy(Paths.get(absolutePath), zout);
             zout.closeEntry();
