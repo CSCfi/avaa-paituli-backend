@@ -81,6 +81,7 @@ public class FileOperations {
             subPaths
                     .map(Path::toAbsolutePath)
                     .forEach(subPath -> {
+                        LOG.info(subPath.toString());
                         if (Files.isDirectory(subPath)) {
                             copyDirectoryToZip(subPath.toString(), zout);
                         } else {
