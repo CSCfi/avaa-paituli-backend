@@ -35,7 +35,7 @@ public class DownloadGeneratorTest {
     @Captor
     ArgumentCaptor<String> stringCaptor;
 
-    private final String inputPath = "/foo";
+    private final String inputPath = "/foo/";
     private final String outputPath = "/bar";
     private final String outputBaseUrl = "http://www.example.com";
     private final String ftpBaseUrl = "http://ftp.example.com";
@@ -296,7 +296,7 @@ public class DownloadGeneratorTest {
     }
 
     private String absolutePathFor(String filePath) {
-        return String.format("%s/%s", inputPath, filePath);
+        return String.format("%s%s", inputPath, filePath);
     }
 
     private String ftpUrlFor(String absolutePath) {
