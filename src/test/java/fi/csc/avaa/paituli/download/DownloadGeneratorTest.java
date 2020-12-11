@@ -1,24 +1,29 @@
 package fi.csc.avaa.paituli.download;
 
-import fi.csc.avaa.paituli.constants.DownloadType;
-import fi.csc.avaa.paituli.download.io.FileOperationException;
-import fi.csc.avaa.paituli.download.io.FileOperations;
-import fi.csc.avaa.paituli.model.DownloadRequest;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.*;
-import org.mockito.junit.jupiter.MockitoExtension;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import fi.csc.avaa.paituli.constants.DownloadType;
+import fi.csc.avaa.paituli.download.io.FileOperationException;
+import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.model.DownloadRequest;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadGeneratorTest {
@@ -128,15 +133,19 @@ public class DownloadGeneratorTest {
                 absolutePathFor(filePathC),
                 absolutePathFor(filePathB)
         );
+        final int lastSeparatorIndex = inputPath.lastIndexOf('/');
+        final String basePath = inputPath.substring(0, lastSeparatorIndex);
+
         DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.LIST;
         request.filePaths = filePaths;
+
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePathD)))
                 .thenReturn(true);
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePathA)))
                 .thenReturn(true);
-        Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
+        Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
         String downloadUrl = generator.generate(request);
@@ -210,13 +219,16 @@ public class DownloadGeneratorTest {
                 absolutePathFor("file1.zip"),
                 absolutePathFor("file2.zip")
         );
+        final int lastSeparatorIndex = inputPath.lastIndexOf('/');
+        final String basePath = inputPath.substring(0, lastSeparatorIndex);
+
         DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.ZIP;
         request.filePaths = filePaths;
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(normalFilePath)))
                 .thenReturn(true);
-        Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
+        Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
         String downloadUrl = generator.generate(request);
@@ -228,7 +240,7 @@ public class DownloadGeneratorTest {
         Mockito.verify(fileOperations)
                 .fileExists(absolutePathFor(normalFilePath));
         Mockito.verify(fileOperations)
-                .findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex);
+                .findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex);
         Mockito.verify(fileOperations)
                 .packageFiles(listCaptor.capture(), stringCaptor.capture());
 
@@ -265,11 +277,13 @@ public class DownloadGeneratorTest {
         final String wildcardFilePath = "file*.zip";
         final List<String> filePaths = Collections.singletonList(wildcardFilePath);
         final String wildcardFilePathAsRegex = "file.*\\.zip";
+        final int lastSeparatorIndex = inputPath.lastIndexOf('/');
+        final String basePath = inputPath.substring(0, lastSeparatorIndex);
         DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.ZIP;
         request.filePaths = filePaths;
 
-        Mockito.when(fileOperations.findFilenamesMatchingRegex(inputPath, wildcardFilePathAsRegex))
+        Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenThrow(new FileOperationException(new IOException()));
 
         Assertions.assertThrows(FileOperationException.class, () -> {

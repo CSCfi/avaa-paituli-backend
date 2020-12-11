@@ -1,18 +1,19 @@
 package fi.csc.avaa.paituli.download;
 
-import fi.csc.avaa.paituli.constants.DownloadType;
-import fi.csc.avaa.paituli.download.io.FileOperations;
-import fi.csc.avaa.paituli.model.DownloadRequest;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+
+import fi.csc.avaa.paituli.constants.DownloadType;
+import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.model.DownloadRequest;
 
 @ApplicationScoped
 public class DownloadGenerator {
