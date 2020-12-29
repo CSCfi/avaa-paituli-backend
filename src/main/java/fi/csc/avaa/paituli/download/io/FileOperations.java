@@ -22,12 +22,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import org.jboss.logging.Logger;
-
 @ApplicationScoped
 public class FileOperations {
 
-    private static final Logger LOG = Logger.getLogger(FileOperations.class);
 
     @ConfigProperty(name = "paituli.download.inputPath")
     String inputPath;
@@ -81,7 +78,6 @@ public class FileOperations {
             subPaths
                     .map(Path::toAbsolutePath)
                     .forEach(subPath -> {
-                        LOG.info(subPath.toString());
                         if (Files.isDirectory(subPath)) {
                             copyDirectoryToZip(subPath.toString(), zout);
                         } else {
@@ -126,7 +122,6 @@ public class FileOperations {
                 : Deflater.BEST_COMPRESSION;
         zout.setLevel(compressionLevel);
         try {
-            LOG.info("CopyRegularFileToZIp: " + absolutePath);
             zout.putNextEntry(new ZipEntry(zipEntryNameFor(absolutePath)));
             Files.copy(Paths.get(absolutePath), zout);
             zout.closeEntry();
