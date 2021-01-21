@@ -1,4 +1,4 @@
-# AVAA Paituli Rahti
+# Paituli backend repository
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
@@ -27,8 +27,6 @@ Alternatively you can override them with the environment variables, see Overridi
 ```
 export PAITULI_DOWNLOAD_OUTPUTPATH=/home/username/temp ; ./mvnw quarkus:dev
 ```
-
-## TODO: Running in production
 
 ## Packaging and running the application
 
