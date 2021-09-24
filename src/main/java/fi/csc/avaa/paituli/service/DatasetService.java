@@ -20,16 +20,16 @@ public class DatasetService {
                     .map(dataset -> LocalizedDataset.from(dataset, locale))
                     .collect(Collectors.toList());
         }
-        catch (Exception e)
-24         {
-25             System.out.println("Test4");
-26             // printStackTrace method
-27             // prints line numbers + call stack
-28             e.printStackTrace();
-29
-30             // Prints what exception has been thrown
-31             System.out.println(e);
-32             return null;
-33         }
+        catch (Exception e)         
+        {
+             System.out.println("Test4");
+             // printStackTrace method
+             // prints line numbers + call stack
+             e.printStackTrace();
+
+             // Prints what exception has been thrown
+             System.out.println(e);
+             return null;
+         }
     }
 }
