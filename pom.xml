@@ -18,7 +18,7 @@
     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
     <quarkus.platform.version>1.12.2.Final</quarkus.platform.version>
     <surefire-plugin.version>2.22.1</surefire-plugin.version>
-    <jackson.version>2.10.5.1</jackson.version>
+    <jackson.version>2.12.7.1</jackson.version>
   </properties>
   <dependencyManagement>
     <dependencies>
