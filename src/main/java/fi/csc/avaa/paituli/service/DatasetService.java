@@ -15,11 +15,21 @@ public class DatasetService {
 
     @Transactional
     public List<LocalizedDataset> getLocalizedDatasets(Locale locale) {
-        try (Stream<Dataset> stream = Dataset.streamAll()) {
+        try (Stream<Dataset> stream = Dataset.stream("access", 1)) {
             return stream
-                    .filter(dataset -> dataset.getAccess() == 1)
                     .map(dataset -> LocalizedDataset.from(dataset, locale))
                     .collect(Collectors.toList());
         }
+        catch (Exception e)         
+        {
+             System.out.println("Test4");
+             // printStackTrace method
+             // prints line numbers + call stack
+             e.printStackTrace();
+
+             // Prints what exception has been thrown
+             System.out.println(e);
+             return null;
+         }
     }
 }

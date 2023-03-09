@@ -8,8 +8,12 @@ import javax.inject.Inject;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
+import org.jboss.logging.Logger;
+
 @ApplicationScoped
 public class DownloadService {
+    
+    private static final Logger LOG = Logger.getLogger(DownloadService.class);
 
     @Inject
     DownloadGenerator downloadGenerator;
@@ -24,6 +28,7 @@ public class DownloadService {
         return CompletableFuture.supplyAsync(() -> downloadGenerator.generate(request))
                 .whenComplete((downloadUrl, err) -> {
                     if (err != null) {
+                        LOG.info("Could not generate download: " + err.getMessage());
                         System.err.println("Could not generate download: " + err.getMessage());
                     } else {
                         emailService.sendEmail(request, downloadUrl);
