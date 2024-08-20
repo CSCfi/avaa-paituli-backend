@@ -6,9 +6,9 @@ import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.ws.rs.core.Response;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.core.Response;
 import java.text.MessageFormat;
 import java.util.Locale;
 import java.util.ResourceBundle;

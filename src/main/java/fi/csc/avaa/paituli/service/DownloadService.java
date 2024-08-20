@@ -3,8 +3,8 @@ package fi.csc.avaa.paituli.service;
 import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 

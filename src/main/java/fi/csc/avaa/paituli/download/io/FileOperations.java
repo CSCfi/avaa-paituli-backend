@@ -4,7 +4,7 @@ import fi.csc.avaa.paituli.constants.Constants;
 import org.apache.commons.io.FilenameUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import javax.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.ApplicationScoped;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;

@@ -5,8 +5,8 @@ import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import javax.enterprise.context.ApplicationScoped;
-import javax.transaction.Transactional;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Transactional;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

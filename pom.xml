@@ -6,19 +6,19 @@
   <artifactId>paituli-backend</artifactId>
   <version>1.0.1</version>
   <properties>
-    <compiler-plugin.version>3.10.1</compiler-plugin.version>
-    <jacoco.version>0.8.5</jacoco.version>
+    <compiler-plugin.version>3.12.1</compiler-plugin.version>
+    <jacoco.version>0.8.12</jacoco.version>
     <maven.compiler.parameters>true</maven.compiler.parameters>
-    <maven.compiler.source>11</maven.compiler.source>
-    <maven.compiler.target>11</maven.compiler.target>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <quarkus-plugin.version>2.16.4.Final</quarkus-plugin.version>
+    <quarkus-plugin.version>3.13.2</quarkus-plugin.version>
     <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
-    <quarkus.platform.version>2.16.4.Final</quarkus.platform.version>
-    <surefire-plugin.version>2.22.1</surefire-plugin.version>
-    <jackson.version>2.14.2</jackson.version>
+    <quarkus.platform.version>3.13.2</quarkus.platform.version>
+    <surefire-plugin.version>3.2.3</surefire-plugin.version>
+    <jackson.version>2.14.3</jackson.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -97,7 +97,6 @@
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
@@ -271,7 +270,8 @@
         </plugins>
       </build>
       <properties>
-        <quarkus.package.type>native</quarkus.package.type>
+        <quarkus.native.enabled>true</quarkus.native.enabled>
+        <quarkus.package.jar.enabled>false</quarkus.package.jar.enabled>
       </properties>
     </profile>
   </profiles>
