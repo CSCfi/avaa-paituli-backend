@@ -28,7 +28,11 @@ public class LogService {
         logEvent.saltedhash = saltedHash;
         logEvent.organization = organization;
         logEvent.dataset = request.data_id;
-        logEvent.numberOfFiles = request.filenames.size() - 1;
+	int nofiles =   request.filenames.size() - 1;
+	if (nofiles < 1) {
+	    nofiles = 1;
+	}
+        logEvent.numberOfFiles = nofiles;
         // logEvent.downloadType = 3;
         logEvent.downloadType = convertDownloadType(request.downloadType);
         logEvent.persist();
