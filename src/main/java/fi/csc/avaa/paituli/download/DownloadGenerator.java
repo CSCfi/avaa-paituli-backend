@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import fi.csc.avaa.paituli.download.io.FileSizeOperations;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -19,9 +20,13 @@ import fi.csc.avaa.paituli.model.DownloadRequest;
 public class DownloadGenerator {
 
     private static final Logger LOG = Logger.getLogger(DownloadGenerator.class);
+    private static final long K = 1024;
+    private static final long MAXSIZE = 15L * K * K * K;
 
     @Inject
     FileOperations fileOperations;
+
+    FileSizeOperations fileSizeOperations = new FileSizeOperations();
 
     @ConfigProperty(name = "paituli.download.inputPath")
     String inputPath;
@@ -46,6 +51,9 @@ public class DownloadGenerator {
 
     private String generatePackage(List<String> filePaths) {
         List<String> absolutePaths = collectAbsolutePaths(filePaths);
+        long size = fileSizeOperations.count(absolutePaths);
+        if (size > MAXSIZE )
+            return "Too big "+size+" download, max size is "+MAXSIZE;
         String outputFileName = getOutputFilename(DownloadType.ZIP);
         String outputFilePath = getOutputFilePath(outputFileName);
         fileOperations.packageFiles(absolutePaths, outputFilePath);
