@@ -6,7 +6,7 @@ If you want to learn more about Quarkus, please visit its website: https://quark
 
 ## Development setup
 
-1. Install JDK 11, Maven 3.6.2 or newer
+1. Install JDK 17, Maven 3.6.3 or newer
 
 2. Create directories `/tmp/paituli_in` and `/tmp/paituli_out`. They are used for download package input and output.
 Alternatively you can override them with the environment variables, see Overriding settings below.
