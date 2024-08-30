@@ -1,6 +1,7 @@
 package fi.csc.avaa.paituli.service;
 
 import fi.csc.avaa.paituli.download.DownloadGenerator;
+import fi.csc.avaa.paituli.download.io.FileSizesException;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,7 +31,8 @@ public class DownloadService {
                     if (err != null) {
                         LOG.info("Could not generate download: " + err.getMessage());
                         System.err.println("Could not generate download: " + err.getMessage());
-                        emailService.sendEmail(request, downloadUrl);
+                        if (err instanceof FileSizesException)
+                            emailService.sendErrorEmail(request, err.getMessage());
                     } else {
                         emailService.sendEmail(request, downloadUrl);
                         logService.log(request);

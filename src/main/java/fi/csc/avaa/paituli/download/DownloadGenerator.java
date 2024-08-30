@@ -14,6 +14,7 @@ import org.jboss.logging.Logger;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.download.io.FileSizesException;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 
 @ApplicationScoped
@@ -58,9 +59,11 @@ public class DownloadGenerator {
     private String generatePackage(List<String> filePaths) {
         List<String> absolutePaths = collectAbsolutePaths(filePaths);
         long size = fileSizeOperations.count(absolutePaths);
-        if (size > MAXSIZE )
-            return MESSAGEFI+size/G+EXPLANATIONFI+MAXSIZE/G+GB+
-                   MESSAGEEN+size/G+EXPLANATIONEN+MAXSIZE/G+GB;
+        if (size > MAXSIZE ) {
+            throw new FileSizesException(size);
+            /*return MESSAGEFI + size / G + EXPLANATIONFI + MAXSIZE / G + GB +
+                    MESSAGEEN + size / G + EXPLANATIONEN + MAXSIZE / G + GB;*/
+        }
         String outputFileName = getOutputFilename(DownloadType.ZIP);
         String outputFilePath = getOutputFilePath(outputFileName);
         fileOperations.packageFiles(absolutePaths, outputFilePath);

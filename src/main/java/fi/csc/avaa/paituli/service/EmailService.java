@@ -68,7 +68,8 @@ public class EmailService {
                 .stream()
                 .sorted()
                 .collect(Collectors.joining("<br>", "<br>", "."));
-        Mail mail =  Mail.withText(request.email, subject, template);
+        String body = MessageFormat.format(template, errormessage);
+        Mail mail =  Mail.withText(request.email, subject, body);
         return mailer.send(mail)
                 .subscribeAsCompletionStage()
                 .thenApply(x -> Response.accepted().build());
