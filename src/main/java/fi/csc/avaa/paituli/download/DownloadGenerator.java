@@ -23,10 +23,11 @@ public class DownloadGenerator {
     private static final long K = 1024;
     private static final long G =  K * K * K;
     private static final long MAXSIZE = 15L * G;
+    private static final String GB ="GB";
     private static final String MESSAGEFI = "Latauspaketin generointi epäonnistui. Tilaamasi aineistojen koko on ";
-    private static final String MESSAGEEN = "%nThe generation of download package failed. The size of the ordered files is ";
-    private static final String EXPLANATIONFI = "GB. Kerralla voi ladata max ";
-     private static final String EXPLANATIONEN = "Gb. At once, it is possible to download max ";
+    private static final String MESSAGEEN = "\nThe generation of download package failed. The size of the ordered files is ";
+    private static final String EXPLANATIONFI = GB+". Kerralla voi ladata max ";
+     private static final String EXPLANATIONEN = GB+". At once, it is possible to download max ";
 
     @Inject
     FileOperations fileOperations;
@@ -58,8 +59,8 @@ public class DownloadGenerator {
         List<String> absolutePaths = collectAbsolutePaths(filePaths);
         long size = fileSizeOperations.count(absolutePaths);
         if (size > MAXSIZE )
-            return MESSAGEFI+size/G+EXPLANATIONFI+MAXSIZE/G+
-                   MESSAGEEN+size/G+EXPLANATIONEN+MAXSIZE/G;
+            return MESSAGEFI+size/G+EXPLANATIONFI+MAXSIZE/G+GB+
+                   MESSAGEEN+size/G+EXPLANATIONEN+MAXSIZE/G+GB;
         String outputFileName = getOutputFilename(DownloadType.ZIP);
         String outputFilePath = getOutputFilePath(outputFileName);
         fileOperations.packageFiles(absolutePaths, outputFilePath);
