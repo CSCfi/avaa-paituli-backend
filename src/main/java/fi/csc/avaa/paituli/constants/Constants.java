@@ -13,6 +13,8 @@ public final class Constants {
 
     public static final String MSG_PACKAGE_EMAIL_SUBJECT = "package_email_subject";
     public static final String MSG_PACKAGE_EMAIL_BODY_TEMPLATE = "package_email_body_template";
+    public static final String ERROR_MSG_EMAIL_SUBJECT = "package_error_email_subject";
+    public static final String ERROR_MSG_EMAIL_BODY_TEMPLATE = "package_error_email_body_template";
     public static final String MSG_URL_LIST_EMAIL_SUBJECT = "url_list_email_subject";
     public static final String MSG_URL_LIST_EMAIL_BODY_TEMPLATE = "url_list_email_body_template";
 

@@ -30,6 +30,7 @@ public class DownloadService {
                     if (err != null) {
                         LOG.info("Could not generate download: " + err.getMessage());
                         System.err.println("Could not generate download: " + err.getMessage());
+                        emailService.sendEmail(request, downloadUrl);
                     } else {
                         emailService.sendEmail(request, downloadUrl);
                         logService.log(request);

@@ -62,7 +62,6 @@ public class DownloadServiceTest {
                     .isInstanceOf(FileOperationException.class);
         }
 
-        Mockito.verifyNoInteractions(emailService);
         Mockito.verifyNoInteractions(logService);
     }
 
