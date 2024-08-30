@@ -31,8 +31,13 @@ public class DownloadService {
                     if (err != null) {
                         LOG.info("Could not generate download: " + err.getMessage());
                         System.err.println("Could not generate download: " + err.getMessage());
-                        if (err instanceof FileSizesException)
+                        if (err instanceof FileSizesException) {
                             emailService.sendErrorEmail(request, err.getMessage());
+                            LOG.info("Send error email");
+                        } else {
+                            LOG.info("muu virhe tai err instanceof FileSizesException ei toiminut")
+                        }
+
                     } else {
                         emailService.sendEmail(request, downloadUrl);
                         logService.log(request);
