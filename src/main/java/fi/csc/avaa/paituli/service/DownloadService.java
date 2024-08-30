@@ -35,7 +35,7 @@ public class DownloadService {
                             emailService.sendErrorEmail(request, err.getMessage());
                             LOG.info("Send error email");
                         } else {
-                            LOG.info("muu virhe tai err instanceof FileSizesException ei toiminut")
+                            LOG.info("muu virhe tai err instanceof FileSizesException ei toiminut");
                         }
 
                     } else {
