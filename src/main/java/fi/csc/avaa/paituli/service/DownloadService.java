@@ -31,7 +31,8 @@ public class DownloadService {
                     if (err != null) {
                         LOG.info("Could not generate download: " + err.getMessage());
                         System.err.println("Could not generate download: " + err.getMessage());
-                        if (err instanceof FileSizesException) {
+                        LOG.info("Poikkeuksen tyyppi: " + err.getClass().getName());
+                        if (err instanceof fi.csc.avaa.paituli.download.io.FileSizesException) {
                             emailService.sendErrorEmail(request, err.getMessage());
                             LOG.info("Send error email");
                         } else {
