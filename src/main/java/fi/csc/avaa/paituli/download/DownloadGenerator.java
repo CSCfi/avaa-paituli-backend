@@ -64,7 +64,7 @@ public class DownloadGenerator {
         List<String> absolutePaths = collectAbsolutePaths(filePaths);
         long size = fileSizeOperations.count(absolutePaths);
         if (size > MAXSIZE ) {
-            emailService.sendErrorEmail(request, size);
+            emailService.sendErrorEmail(request, size/G);
             throw new FileSizesException(size);
             /*return MESSAGEFI + size / G + EXPLANATIONFI + MAXSIZE / G + GB +
                     MESSAGEEN + size / G + EXPLANATIONEN + MAXSIZE / G + GB;*/
