@@ -60,7 +60,7 @@ public class EmailService {
         return Mail.withHtml(request.email, subject, body);
     }
 
-     public CompletionStage<Response> sendErrorEmail(DownloadRequest request, String errormessage) {
+     public CompletionStage<Response> sendErrorEmail(DownloadRequest request, long errormessage) {
         ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(request.locale));
         String subject = messages.getString(Constants.ERROR_MSG_EMAIL_SUBJECT);
         String template = messages.getString(Constants.ERROR_MSG_EMAIL_BODY_TEMPLATE);

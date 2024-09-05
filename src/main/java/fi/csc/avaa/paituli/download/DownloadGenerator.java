@@ -6,6 +6,7 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 import fi.csc.avaa.paituli.download.io.FileSizeOperations;
+import fi.csc.avaa.paituli.service.EmailService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -33,6 +34,9 @@ public class DownloadGenerator {
     @Inject
     FileOperations fileOperations;
 
+     @Inject
+     EmailService emailService;
+
     FileSizeOperations fileSizeOperations = new FileSizeOperations();
 
     @ConfigProperty(name = "paituli.download.inputPath")
@@ -52,14 +56,15 @@ public class DownloadGenerator {
 
     public String generate(DownloadRequest request) {
         return request.downloadType.equals(DownloadType.ZIP)
-                ? generatePackage(request.filePaths)
+                ? generatePackage(request.filePaths, request)
                 : generateUrlList(request.filePaths);
     }
 
-    private String generatePackage(List<String> filePaths) {
+    private String generatePackage(List<String> filePaths, DownloadRequest request) {
         List<String> absolutePaths = collectAbsolutePaths(filePaths);
         long size = fileSizeOperations.count(absolutePaths);
         if (size > MAXSIZE ) {
+            emailService.sendErrorEmail(request, size);
             throw new FileSizesException(size);
             /*return MESSAGEFI + size / G + EXPLANATIONFI + MAXSIZE / G + GB +
                     MESSAGEEN + size / G + EXPLANATIONEN + MAXSIZE / G + GB;*/
