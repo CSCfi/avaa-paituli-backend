@@ -65,7 +65,7 @@ public class DownloadGenerator {
         long size = fileSizeOperations.count(absolutePaths);
         if (size > MAXSIZE ) {
             emailService.sendErrorEmail(request, size/G);
-            throw new FileSizesException(size);
+            throw new FileSizesException(size+" "+request.data_id);
             /*return MESSAGEFI + size / G + EXPLANATIONFI + MAXSIZE / G + GB +
                     MESSAGEEN + size / G + EXPLANATIONEN + MAXSIZE / G + GB;*/
         }
