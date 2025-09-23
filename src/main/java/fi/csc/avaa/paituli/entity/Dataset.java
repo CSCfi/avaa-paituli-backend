@@ -28,6 +28,7 @@ public class Dataset extends PanacheEntityBase {
     public String license_url;
     public String format_eng;
     public String funet;
+    public String stac_id;
 
     public Integer getAccess(){
         return access;

@@ -25,6 +25,7 @@ public class LocalizedDataset {
     public String license_url;
     public String funet;
     public Integer data_max_scale;
+    public String stac_id;
 
     public static LocalizedDataset from(Dataset dataset, Locale locale) {
         boolean isLocaleFi = locale.equals(Constants.LOCALE_FI);
@@ -53,6 +54,7 @@ public class LocalizedDataset {
         localized.license_url = dataset.license_url;
         localized.funet = dataset.funet;
         localized.data_max_scale = dataset.data_max_scale;
+        localized.stac_id = dataset.stac_id;
         return localized;
     }
 }
