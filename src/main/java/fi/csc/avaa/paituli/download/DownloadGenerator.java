@@ -2,21 +2,19 @@ package fi.csc.avaa.paituli.download;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.stream.Collectors;
-
-import fi.csc.avaa.paituli.download.io.FileSizeOperations;
-import fi.csc.avaa.paituli.service.EmailService;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
-import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.download.io.FileSizeOperations;
 import fi.csc.avaa.paituli.download.io.FileSizesException;
-import fi.csc.avaa.paituli.model.DownloadRequest;
+import fi.csc.avaa.paituli.download.io.FileOperations.ZipProgress;
+import fi.csc.avaa.paituli.service.LogService;
+import fi.csc.avaa.paituli.model.DownloadJob;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 @ApplicationScoped
 public class DownloadGenerator {
@@ -25,101 +23,92 @@ public class DownloadGenerator {
     private static final long K = 1024;
     private static final long G =  K * K * K;
     private static final long MAXSIZE = 15L * G;
-    private static final String GB ="GB";
-    private static final String MESSAGEFI = "Latauspaketin generointi epäonnistui. Tilaamasi aineistojen koko on ";
-    private static final String MESSAGEEN = "\nThe generation of download package failed. The size of the ordered files is ";
-    private static final String EXPLANATIONFI = GB+". Kerralla voi ladata max ";
-     private static final String EXPLANATIONEN = GB+". At once, it is possible to download max ";
 
     @Inject
     FileOperations fileOperations;
 
-     @Inject
-     EmailService emailService;
+    @Inject
+    LogService logService;
 
     FileSizeOperations fileSizeOperations = new FileSizeOperations();
 
     @ConfigProperty(name = "paituli.download.inputPath")
     String inputPath;
 
-    @ConfigProperty(name = "paituli.download.outputPath")
-    String outputPath;
-
-    @ConfigProperty(name = "paituli.download.outputBaseUrl")
-    String outputBaseUrl;
-
     @ConfigProperty(name = "paituli.download.ftpBaseUrl")
     String ftpBaseUrl;
 
-    @ConfigProperty(name = "paituli.download.filePrefix")
-    String filePrefix;
-
-    public String generate(DownloadRequest request) {
-        return request.downloadType.equals(DownloadType.ZIP)
-                ? generatePackage(request.filePaths, request)
-                : generateUrlList(request.filePaths);
-    }
-
-    private String generatePackage(List<String> filePaths, DownloadRequest request) {
-        List<String> absolutePaths = collectAbsolutePaths(filePaths);
-        long size = fileSizeOperations.count(absolutePaths);
-        if (size > MAXSIZE ) {
-            emailService.sendErrorEmail(request, size/G);
-            throw new FileSizesException(size+" "+request.data_id);
-            /*return MESSAGEFI + size / G + EXPLANATIONFI + MAXSIZE / G + GB +
-                    MESSAGEEN + size / G + EXPLANATIONEN + MAXSIZE / G + GB;*/
+    public void generate(DownloadJob job) {
+        switch (job.request.downloadType) {
+            case ZIP: generateZip(job); break;
+            case LIST: generateUrlList(job); break;
+            default:
+                throw new IllegalArgumentException(
+                    "Unsupported download type " + job.request.downloadType.toString());
         }
-        String outputFileName = getOutputFilename(DownloadType.ZIP);
-        String outputFilePath = getOutputFilePath(outputFileName);
-        fileOperations.packageFiles(absolutePaths, outputFilePath);
-        return getDownloadUrl(outputFileName);
     }
 
-    private String generateUrlList(List<String> filePaths) {
-        List<String> ftpUrls = collectFtpUrls(filePaths);
-        String outputFileName = getOutputFilename(DownloadType.LIST);
-        String outputFilePath = getOutputFilePath(outputFileName);
-        fileOperations.writeUrlList(ftpUrls, outputFilePath);
-        return getDownloadUrl(outputFileName);
+    public void processJob(DownloadJob job) {
+        LOG.infof("%s Starting job processing", job);
+        try {
+            generate(job);
+        }
+        catch (Exception err) {
+            LOG.error("Could not generate download", err);
+            job.error = err.getMessage();
+            throw err;
+        }
+        job.progress = 1.0; // Signals job completion 
+        LOG.infof("%s Completed with output %s", job, job.outputFilePath);
+        logService.log(job.request);
     }
 
-    private String getOutputFilename(DownloadType type) {
-        String randomNumbers = new Random().ints(8, 0, 10)
-                .mapToObj(String::valueOf)
-                .collect(Collectors.joining());
-        return String.format("%s%s.%s", filePrefix, randomNumbers, type.getExtension());
+    private void generateZip(DownloadJob job) {
+        List<String> paths = collectAbsolutePaths(job);
+        long filesSize = fileSizeOperations.count(paths);
+        if (filesSize > MAXSIZE ) {
+            throw new FileSizesException(filesSize+" "+job.request.data_id);
+        }
+        for (ZipProgress zip : fileOperations.zipper(paths, job.outputFilePath))
+        {
+            job.progress = zip.progress(); 
+            LOG.debugf("%s Zipped %s", job, zip.added());
+        }
     }
 
-    private String getOutputFilePath(String filename) {
-        return String.format("%s/%s", outputPath, filename);
+    private void generateUrlList(DownloadJob job) {
+        List<String> urls = collectFtpUrls(job);
+        fileOperations.writeUrlList(urls, job.outputFilePath);
     }
 
-    private String getDownloadUrl(String outputFilename) {
-        return String.format("%s/%s", outputBaseUrl, outputFilename);
-    }
-
-    private List<String> collectAbsolutePaths(List<String> filePaths) {
+    private List<String> collectAbsolutePaths(DownloadJob job) {
         List<String> absolutePaths = new ArrayList<>();
-        filePaths.forEach(filePath -> {
+        job.request.filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s%s", inputPath, filePath);
+            // If we have a wildcard present we do a regex search
             if (absolutePath.contains("*")) {
-                absolutePaths.addAll(findMatchingFiles(absolutePath));
+                List<String> found = findMatchingFiles(absolutePath);
+                if (found.isEmpty()) {
+                    throw new IllegalArgumentException("Did not find any matches for " + absolutePath);
+                }
+                absolutePaths.addAll(found);
+            // Otherwise we simply add the file, if it exists.
             } else {
                 if (fileOperations.fileExists(absolutePath)) {
                     absolutePaths.add(absolutePath);
                 } else {
-                    System.err.println("Requested file cannot be found from path " + absolutePath);
+                    LOG.error("Requested file cannot be found from path " + absolutePath);
                 }
             }
         });
         if (absolutePaths.isEmpty()) {
-            throw new IllegalArgumentException("There were no existing files listed in the filename list");
+            throw new IllegalArgumentException("There were no existing files listed in the request");
         }
         return absolutePaths;
     }
 
-    private List<String> collectFtpUrls(List<String> filePaths) {
-        return collectAbsolutePaths(filePaths)
+    private List<String> collectFtpUrls(DownloadJob job) {
+        return collectAbsolutePaths(job)
                 .stream()
                 .sorted()
                 .map(absolutePath -> String.format("%s%s", ftpBaseUrl, absolutePath))
@@ -130,7 +119,8 @@ public class DownloadGenerator {
         int lastSeparatorIndex = absolutePath.lastIndexOf('/');
         String basePath = absolutePath.substring(0, lastSeparatorIndex);
         String regex = toRegex(absolutePath.substring(lastSeparatorIndex + 1));
-        return fileOperations.findFilenamesMatchingRegex(basePath, regex);
+        List<String> found = fileOperations.findFilenamesMatchingRegex(basePath, regex);
+        return found;
     }
 
     private static String toRegex(String filenameWithWildcard) {
@@ -139,4 +129,5 @@ public class DownloadGenerator {
                 .replace("?", ".?")
                 .replace("*", ".*");
     }
+
 }

@@ -1,40 +1,52 @@
 package fi.csc.avaa.paituli.service;
 
-import fi.csc.avaa.paituli.download.DownloadGenerator;
-import fi.csc.avaa.paituli.download.io.FileSizesException;
-import fi.csc.avaa.paituli.model.DownloadRequest;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.context.ManagedExecutor;
+
+import fi.csc.avaa.paituli.download.DownloadGenerator;
+import fi.csc.avaa.paituli.model.DownloadJob;
+import fi.csc.avaa.paituli.model.DownloadRequest;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.util.Locale;
-import java.util.concurrent.CompletableFuture;
-
-import org.jboss.logging.Logger;
 
 @ApplicationScoped
 public class DownloadService {
     
-    private static final Logger LOG = Logger.getLogger(DownloadService.class);
-
     @Inject
     DownloadGenerator downloadGenerator;
 
     @Inject
-    EmailService emailService;
+    ManagedExecutor managedExecutor;
 
-    @Inject
-    LogService logService;
+    @ConfigProperty(name = "paituli.download.filePrefix")
+    public String filePrefix;
 
-    public CompletableFuture<String> generateDownload(DownloadRequest request) {
-        return CompletableFuture.supplyAsync(() -> downloadGenerator.generate(request))
-                .whenComplete((downloadUrl, err) -> {
-                    if (err != null) {
-                        LOG.info("Could not generate download: " + err.getMessage());
-                        System.err.println("Could not generate download: " + err.getMessage());
-                    } else {
-                        emailService.sendEmail(request, downloadUrl);
-                        logService.log(request);
-                    }
-                });
+    @ConfigProperty(name = "paituli.download.outputPath")
+    public String outputPath;
+
+
+    // Job storage (could later move to DB/Redis)
+    private final Map<String, DownloadJob> jobs = new ConcurrentHashMap<>();
+
+    // Creates a new download job, starts its thread and return the job 
+    public DownloadJob createDownloadJob(DownloadRequest request) {
+
+        // Create a job for the request and store it
+        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        jobs.put(job.ID, job);
+
+        // Start processing immediately.
+        // Alternatively, here we could implement scheduling, priority, etc.
+        managedExecutor.runAsync(() -> {
+            downloadGenerator.processJob(job);
+        });
+        return job;
+    }
+
+    public DownloadJob getJob(String jobId) {
+        return jobs.get(jobId);
     }
 }

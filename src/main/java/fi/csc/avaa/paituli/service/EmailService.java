@@ -64,10 +64,6 @@ public class EmailService {
         ResourceBundle messages = ResourceBundle.getBundle("messages", Locale.forLanguageTag(request.locale));
         String subject = messages.getString(Constants.ERROR_MSG_EMAIL_SUBJECT);
         String template = messages.getString(Constants.ERROR_MSG_EMAIL_BODY_TEMPLATE);
-        String filenames = request.filenames
-                .stream()
-                .sorted()
-                .collect(Collectors.joining("<br>", "<br>", "."));
         String body = MessageFormat.format(template, errormessage);
         Mail mail =  Mail.withText(request.email, subject, body);
         return mailer.send(mail)

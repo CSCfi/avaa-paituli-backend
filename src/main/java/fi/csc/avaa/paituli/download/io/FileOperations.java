@@ -1,10 +1,5 @@
 package fi.csc.avaa.paituli.download.io;
 
-import fi.csc.avaa.paituli.constants.Constants;
-import org.apache.commons.io.FilenameUtils;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import jakarta.enterprise.context.ApplicationScoped;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,7 +9,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.Deflater;
@@ -22,10 +19,18 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.commons.io.FilenameUtils;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
+
+import fi.csc.avaa.paituli.constants.Constants;
+import jakarta.enterprise.context.ApplicationScoped;
+
 
 @ApplicationScoped
 public class FileOperations {
 
+    private static final Logger LOG = Logger.getLogger(FileOperations.class);
 
     @ConfigProperty(name = "paituli.download.inputPath")
     String inputPath;
@@ -45,17 +50,48 @@ public class FileOperations {
         return Files.exists(Paths.get(absolutePath));
     }
 
-    public void packageFiles(List<String> absolutePaths, String outputFilePath) {
-        Path path = Paths.get(outputFilePath);
-        try (ZipOutputStream zout = new ZipOutputStream(
-                new BufferedOutputStream(
-                        Files.newOutputStream(
-                                Files.createFile(path))))) {
-            absolutePaths.forEach(absolutePath -> copyPathToZip(absolutePath, zout));
-            zout.flush();
-        } catch (IOException e) {
-            throw new FileOperationException(e);
-        }
+    public record ZipProgress(String added, double progress) {} 
+
+    public Iterable<ZipProgress> zipper(List<String> filePaths, String outputPath) {
+        return () -> new Iterator<>() {
+            // An iterator for creating zip files and track the zipping progress
+
+            private int numZipped = 0;
+            private final Iterator<String> pathsIterator = filePaths.iterator();
+            private final ZipOutputStream zout;
+
+            // Initializer
+            {
+                try {
+                    Path zipPath = Files.createFile(Paths.get(outputPath));
+                    LOG.info("Zipping " + zipPath); 
+                    zout = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipPath)));
+                } catch (IOException e) {
+                    throw new FileOperationException(e);
+                }
+            }
+
+            @Override
+            public boolean hasNext() {
+                return pathsIterator.hasNext();
+            }
+
+            @Override
+            public ZipProgress next() {
+                if (!hasNext()) throw new NoSuchElementException();
+
+                String path = pathsIterator.next();
+                copyPathToZip(path, zout);
+                if (!hasNext()) close();
+                return new ZipProgress(path, ++numZipped / (double)filePaths.size());
+            }
+
+            private void close()
+            {
+                try { zout.close(); }
+                catch (IOException e) { throw new FileOperationException(e); }
+            }
+        };
     }
 
     public void writeUrlList(List<String> urlList, String outputFilepath) {
