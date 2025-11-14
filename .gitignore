@@ -36,3 +36,6 @@ release.properties
 
 # Quarkus logs
 quarkus.log*
+
+# Environment file 
+.env
