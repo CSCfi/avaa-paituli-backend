@@ -1,21 +1,25 @@
 package fi.csc.avaa.paituli.service;
 
-import fi.csc.avaa.paituli.constants.Constants;
-import fi.csc.avaa.paituli.entity.Dataset;
-import fi.csc.avaa.paituli.model.LocalizedDataset;
-import io.quarkus.test.junit.QuarkusTest;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Locale;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+import fi.csc.avaa.paituli.constants.Constants;
+import fi.csc.avaa.paituli.db.PostgresTestResource;
+import fi.csc.avaa.paituli.entity.Dataset;
+import fi.csc.avaa.paituli.model.LocalizedDataset;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import java.util.List;
-import java.util.Locale;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
+@QuarkusTestResource(PostgresTestResource.class)
 @Tag("integration")
 public class DatasetServiceTest {
 

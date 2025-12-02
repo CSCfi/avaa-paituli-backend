@@ -1,6 +1,7 @@
 package fi.csc.avaa.paituli.download;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 
@@ -9,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,12 +20,15 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import fi.csc.avaa.paituli.service.LogService;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadGeneratorTest {
@@ -31,6 +36,13 @@ public class DownloadGeneratorTest {
     @Mock
     private FileOperations fileOperations;
 
+    @Mock
+    private LogService logService;
+
+    @Mock
+    private ManagedExecutor managedExecutor;
+
+    @Spy
     @InjectMocks
     private DownloadGenerator generator;
 
@@ -42,18 +54,20 @@ public class DownloadGeneratorTest {
 
     private final String inputPath = "/foo/";
     private final String outputPath = "/bar";
-    private final String outputBaseUrl = "http://www.example.com";
     private final String ftpBaseUrl = "http://ftp.example.com";
     private final String filePrefix = "batman_";
-    private final String downloadUrlPrefix = String.format("%s/%s", outputBaseUrl, filePrefix);
 
     @BeforeEach
     public void init() {
         generator.inputPath = inputPath;
-        generator.outputPath = outputPath;
-        generator.outputBaseUrl = outputBaseUrl;
         generator.ftpBaseUrl = ftpBaseUrl;
-        generator.filePrefix = filePrefix;
+    }
+
+    // Shorthand method
+    DownloadJob processDummyJob(DownloadRequest request) {
+        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        generator.processJob(job);
+        return job;
     }
 
     @Test
@@ -67,18 +81,17 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(true);
 
-        String downloadUrl = generator.generate(request);
+        DownloadJob job = processDummyJob(request);
 
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
+        assertThat(job.outputFilename)
+                .startsWith(filePrefix)
                 .endsWith(DownloadType.ZIP.getExtension());
 
         Mockito.verify(fileOperations)
                 .fileExists(absolutePathFor(filePath));
-        /*
+
         Mockito.verify(fileOperations)
-                .packageFiles(listCaptor.capture(), stringCaptor.capture());
-        */
+                .zipper(listCaptor.capture(), stringCaptor.capture());
 
         assertThat(listCaptor.getValue())
                 .hasSize(1)
@@ -103,10 +116,10 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePath))
                 .thenReturn(true);
 
-        String downloadUrl = generator.generate(request);
+        DownloadJob job = processDummyJob(request);
 
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
+        assertThat(job.outputFilename)
+                .startsWith(filePrefix)
                 .endsWith(DownloadType.LIST.getExtension());
 
         Mockito.verify(fileOperations)
@@ -150,10 +163,10 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        String downloadUrl = generator.generate(request);
+        DownloadJob job = processDummyJob(request);
 
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
+        assertThat(job.outputFilename)
+                .startsWith(filePrefix)
                 .endsWith(DownloadType.LIST.getExtension());
 
         Mockito.verify(fileOperations)
@@ -190,18 +203,18 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
                 .thenReturn(false);
 
-        String downloadUrl = generator.generate(request);
+        DownloadJob job = processDummyJob(request);
 
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
+        assertThat(job.outputFilename)
+                .startsWith(filePrefix)
                 .endsWith(DownloadType.ZIP.getExtension());
 
         Mockito.verify(fileOperations)
                 .fileExists(absolutePathFor(filePath1));
         Mockito.verify(fileOperations)
                 .fileExists(absolutePathFor(filePath2));
-/*         Mockito.verify(fileOperations)
-                .packageFiles(listCaptor.capture(), stringCaptor.capture()); */
+        Mockito.verify(fileOperations)
+                .zipper(listCaptor.capture(), stringCaptor.capture());
 
         assertThat(listCaptor.getValue())
                 .hasSize(1)
@@ -233,18 +246,18 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        String downloadUrl = generator.generate(request);
+        DownloadJob job = processDummyJob(request);
 
-        assertThat(downloadUrl)
-                .startsWith(downloadUrlPrefix)
+        assertThat(job.outputFilename)
+                .startsWith(filePrefix)
                 .endsWith(DownloadType.ZIP.getExtension());
 
         Mockito.verify(fileOperations)
                 .fileExists(absolutePathFor(normalFilePath));
         Mockito.verify(fileOperations)
                 .findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex);
-/*         Mockito.verify(fileOperations)
-                .packageFiles(listCaptor.capture(), stringCaptor.capture()); */
+        Mockito.verify(fileOperations)
+                .zipper(listCaptor.capture(), stringCaptor.capture());
 
         assertThat(listCaptor.getValue())
                 .hasSize(3)
@@ -270,7 +283,7 @@ public class DownloadGeneratorTest {
                 .thenReturn(false);
 
         Assertions.assertThrows(IllegalArgumentException.class, () -> {
-            generator.generate(request);
+                processDummyJob(request);
         });
     }
 
@@ -289,7 +302,7 @@ public class DownloadGeneratorTest {
                 .thenThrow(new FileOperationException(new IOException()));
 
         Assertions.assertThrows(FileOperationException.class, () -> {
-            generator.generate(request);
+                processDummyJob(request);
         });
     }
 
@@ -303,11 +316,11 @@ public class DownloadGeneratorTest {
 
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(true);
-/*         Mockito.doThrow(new FileOperationException(new IOException()))
-                .when(fileOperations).packageFiles(anyList(), anyString()); */
+        Mockito.doThrow(new FileOperationException(new IOException()))
+                .when(fileOperations).zipper(anyList(), anyString());
 
         Assertions.assertThrows(FileOperationException.class, () -> {
-            generator.generate(request);
+                processDummyJob(request);
         });
     }
 
@@ -318,4 +331,44 @@ public class DownloadGeneratorTest {
     private String ftpUrlFor(String absolutePath) {
         return String.format("%s%s", ftpBaseUrl, absolutePath);
     }
+
+    @Test
+    public void shouldLogAndNotErrorIfGeneratingDoesNotThrow() {
+
+        // Dummy request
+        final DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+
+        // Start processing but fake generation success
+        Mockito.doNothing()
+                .when(generator).generate(any(DownloadJob.class));
+        DownloadJob job = processDummyJob(request);
+
+        // Ensure we don't have errors and we used the logging service
+        assert(job.error).isEmpty();
+        Mockito.verify(logService).log(request);
+    }
+
+    @Test
+    public void jobShouldErrorAndNotLogIfGeneratingThrows() throws InterruptedException {
+
+        // Make generation throw
+        Mockito.doThrow(new FileOperationException(new IOException("oops")))
+                .when(generator).generate(any());
+
+        // Make mock request and run its job
+        final DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+
+        // The generator propagates exceptions
+        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        Assertions.assertThrows(FileOperationException.class, () -> {
+                generator.processJob(job);
+        });
+
+        // Ensure the throw is handled as expected
+        assert(job.error).contains("oops");
+        Mockito.verifyNoInteractions(logService);
+    }
+
 }
