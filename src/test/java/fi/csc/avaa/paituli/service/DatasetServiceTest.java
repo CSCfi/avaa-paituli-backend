@@ -51,6 +51,7 @@ public class DatasetServiceTest {
         for (int i = 0; i < size; i++) {
             Dataset dataset = new Dataset();
             dataset.data_id = String.valueOf(i);
+            dataset.access = 1;
             dataset.persist();
         }
 
@@ -76,7 +77,7 @@ public class DatasetServiceTest {
         dataset.queries = true;
         dataset.data_max_scale = 6000000;
         dataset.meta = "urn:nbn:fi:test00001000000000000258";
-        dataset.access = 5;
+        dataset.access = 1;
         dataset.license_url = "http://www.example.com";
         dataset.format_eng = "JPEG2000, Lossless";
         dataset.funet = "test/test_normal_color/lossless/";
