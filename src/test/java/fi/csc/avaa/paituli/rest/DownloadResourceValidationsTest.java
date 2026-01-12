@@ -19,7 +19,6 @@ public class DownloadResourceValidationsTest {
     @Test
     public void shouldReturn200WithValidRequest() {
         DownloadRequest request = new DownloadRequest();
-        request.email = "test@example.com";
         request.filePaths = Collections.singletonList("test");
         request.filenames = Collections.singletonList("test");
         request.downloadType = DownloadType.ZIP;
@@ -46,7 +45,7 @@ public class DownloadResourceValidationsTest {
                 .statusCode(400)
                 .assertThat()
                 .body("parameterViolations.message", message -> hasItems("must not be null", "must not be empty"))
-                .body("parameterViolations.path", path -> hasItems("generateDownload.downloadRequest.email",
+                .body("parameterViolations.path", path -> hasItems(
                         "generateDownload.downloadRequest.filePaths", "generateDownload.downloadRequest.locale",
                         "generateDownload.downloadRequest.filenames", "generateDownload.downloadRequest.downloadType"));
     }

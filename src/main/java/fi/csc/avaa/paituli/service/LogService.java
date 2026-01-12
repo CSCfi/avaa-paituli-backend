@@ -21,12 +21,8 @@ public class LogService {
 
     @Transactional
     public void log(DownloadRequest request) {
-        String organization = request.email.substring(request.email.indexOf('@') + 1);
-        String saltedHash = hash(request.email);
         LogEvent logEvent = new LogEvent();
         logEvent.timestamp = new Date();
-        logEvent.saltedhash = saltedHash;
-        logEvent.organization = organization;
         logEvent.dataset = request.data_id;
 	int nofiles =   request.filenames.size() - 1;
 	if (nofiles < 1) {
