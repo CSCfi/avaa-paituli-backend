@@ -3,7 +3,7 @@ package fi.csc.avaa.paituli.download;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -91,12 +91,12 @@ public class DownloadGeneratorTest {
                 .fileExists(absolutePathFor(filePath));
 
         Mockito.verify(fileOperations)
-                .zipper(listCaptor.capture(), stringCaptor.capture());
+                .zipper(eq(job), listCaptor.capture());
 
         assertThat(listCaptor.getValue())
                 .hasSize(1)
                 .contains(absolutePathFor(filePath));
-        assertThat(stringCaptor.getValue())
+        assertThat(job.outputFilePath)
                 .startsWith(outputPath + "/" + filePrefix)
                 .endsWith(DownloadType.ZIP.getExtension());
     }
@@ -214,12 +214,12 @@ public class DownloadGeneratorTest {
         Mockito.verify(fileOperations)
                 .fileExists(absolutePathFor(filePath2));
         Mockito.verify(fileOperations)
-                .zipper(listCaptor.capture(), stringCaptor.capture());
+                .zipper(eq(job), listCaptor.capture());
 
         assertThat(listCaptor.getValue())
                 .hasSize(1)
                 .contains(absolutePathFor(filePath1));
-        assertThat(stringCaptor.getValue())
+        assertThat(job.outputFilePath)
                 .startsWith(outputPath + "/" + filePrefix)
                 .endsWith(DownloadType.ZIP.getExtension());
     }
@@ -257,7 +257,7 @@ public class DownloadGeneratorTest {
         Mockito.verify(fileOperations)
                 .findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex);
         Mockito.verify(fileOperations)
-                .zipper(listCaptor.capture(), stringCaptor.capture());
+                .zipper(eq(job), listCaptor.capture());
 
         assertThat(listCaptor.getValue())
                 .hasSize(3)
@@ -266,7 +266,7 @@ public class DownloadGeneratorTest {
                         matchingFiles.get(0),
                         matchingFiles.get(1)
                 );
-        assertThat(stringCaptor.getValue())
+        assertThat(job.outputFilePath)
                 .startsWith(outputPath + "/" + filePrefix)
                 .endsWith(DownloadType.ZIP.getExtension());
     }
@@ -317,7 +317,7 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(true);
         Mockito.doThrow(new FileOperationException(new IOException()))
-                .when(fileOperations).zipper(anyList(), anyString());
+                .when(fileOperations).zipper(any(), anyList());
 
         Assertions.assertThrows(FileOperationException.class, () -> {
                 processDummyJob(request);

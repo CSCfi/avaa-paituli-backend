@@ -58,8 +58,13 @@ public class DownloadGenerator {
             job.error = err.getMessage();
             throw err;
         }
-        job.progress = 1.0; // Signals job completion 
-        LOG.infof("%s Completed with output %s", job, job.outputFilePath);
+        if (job.cancelled) {
+            LOG.infof("%s Canceled", job);
+        }
+        else {
+            job.progress = 1.0; // Signals job completion
+            LOG.infof("%s Completed with output %s", job, job.outputFilePath);
+        }
         logService.log(job.request);
     }
 
@@ -69,7 +74,7 @@ public class DownloadGenerator {
         if (filesSize > MAXSIZE ) {
             throw new FileSizesException(filesSize+" "+job.request.data_id);
         }
-        for (ZipProgress zip : fileOperations.zipper(paths, job.outputFilePath))
+        for (ZipProgress zip : fileOperations.zipper(job, paths))
         {
             job.progress = zip.progress(); 
             LOG.debugf("%s Zipped %s", job, zip.added());

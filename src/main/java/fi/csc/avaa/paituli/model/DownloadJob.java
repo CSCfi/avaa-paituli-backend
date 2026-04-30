@@ -15,6 +15,7 @@ public class DownloadJob {
     public final String outputFilePath;
 
     public volatile double progress; // from 0.0 to 1.0
+    public volatile boolean cancelled;
     public volatile String error;
 
     public DownloadJob(

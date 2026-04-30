@@ -60,12 +60,32 @@ public class DownloadResource {
         return Response.ok(jobResponse(job, "")).build();
     }
 
+    // Marks a job for cancellation
+    @POST
+    @Path("/cancel/{jobId}")
+    public Response cancelDownload(@PathParam("jobId") String jobId) {
+        DownloadJob job = downloadService.getJob(jobId);
+        if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
+
+        // We don't care if the job has already completed or not
+        job.cancelled = true;
+        return Response.ok(jobResponse(job, "Job will be cancelled")).build();
+    }
+
+
     // Serves the output of a (completed) job for download 
     @GET
     @Path("/{jobId}")
     public Response serveOutput(@PathParam("jobId") String jobId) {
         DownloadJob job = downloadService.getJob(jobId);
         if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
+
+        if (job.cancelled) {
+            return Response
+                .status(Response.Status.GONE)
+                .entity(jobResponse(job, "Processing of this job was cancelled"))
+                .build();
+        }
 
         if (!job.error.isEmpty()) {
             // Something went wrong during the processing

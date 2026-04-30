@@ -11,7 +11,6 @@ import java.nio.file.Paths;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.Deflater;
@@ -24,6 +23,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import fi.csc.avaa.paituli.constants.Constants;
+import fi.csc.avaa.paituli.model.DownloadJob;
 import jakarta.enterprise.context.ApplicationScoped;
 
 
@@ -52,9 +52,9 @@ public class FileOperations {
 
     public record ZipProgress(String added, double progress) {} 
 
-    public Iterable<ZipProgress> zipper(List<String> filePaths, String outputPath) {
+    public Iterable<ZipProgress> zipper(DownloadJob job, List<String> filePaths) {
         return () -> new Iterator<>() {
-            // An iterator for creating zip files and track the zipping progress
+            // A cancelable iterator for creating zip files and track the zipping progress
 
             private int numZipped = 0;
             private final Iterator<String> pathsIterator = filePaths.iterator();
@@ -63,7 +63,7 @@ public class FileOperations {
             // Initializer
             {
                 try {
-                    Path zipPath = Files.createFile(Paths.get(outputPath));
+                    Path zipPath = Files.createFile(Paths.get(job.outputFilePath));
                     LOG.info("Zipping " + zipPath); 
                     zout = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipPath)));
                 } catch (IOException e) {
@@ -73,16 +73,17 @@ public class FileOperations {
 
             @Override
             public boolean hasNext() {
-                return pathsIterator.hasNext();
+                if (!pathsIterator.hasNext() || job.cancelled) {
+                    close();
+                    return false;
+                }
+                return true;
             }
 
             @Override
             public ZipProgress next() {
-                if (!hasNext()) throw new NoSuchElementException();
-
                 String path = pathsIterator.next();
                 copyPathToZip(path, zout);
-                if (!hasNext()) close();
                 return new ZipProgress(path, ++numZipped / (double)filePaths.size());
             }
 
