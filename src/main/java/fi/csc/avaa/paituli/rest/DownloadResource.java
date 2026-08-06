@@ -68,10 +68,11 @@ public class DownloadResource {
         DownloadJob job = downloadService.getJob(jobId);
         if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
 
-        // Cancelling a finished job would deny access to a package that is
-        // complete and still on disk, so it is a no-op.
-        if (!job.processing()) {
-            return Response.ok(jobResponse(job, "Job has already completed")).build();
+        // Cancelling a job that has already stopped is a no-op: for a completed
+        // job it would deny access to a package that is still on disk, and for
+        // a failed one it would hide the failure behind a cancellation.
+        if (!job.processing() || job.failed()) {
+            return Response.ok(jobResponse(job, "Job is no longer processing")).build();
         }
 
         job.cancelled = true;

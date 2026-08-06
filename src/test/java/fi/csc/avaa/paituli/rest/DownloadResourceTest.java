@@ -121,4 +121,74 @@ public class DownloadResourceTest {
         Map<String, Object> entity = (Map<String, Object>) response.getEntity();
         assertThat(entity.get("cancelled")).isEqualTo(true);
     }
+
+    @Test
+    public void unknownJobShouldBeNotFoundOnEveryEndpoint() {
+        Mockito.when(downloadService.getJob("no-such-job")).thenReturn(null);
+
+        assertThat(downloadResource.getStatus("no-such-job").getStatus()).isEqualTo(404);
+        assertThat(downloadResource.cancelDownload("no-such-job").getStatus()).isEqualTo(404);
+        assertThat(downloadResource.serveOutput("no-such-job").getStatus()).isEqualTo(404);
+    }
+
+    @Test
+    public void serveOutputShouldConflictWhileStillProcessing() {
+        DownloadJob job = dummyJob();
+        job.progress = 0.5;
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(409);
+    }
+
+    @Test
+    public void serveOutputShouldReportGoneWhenOutputWasCleaned() {
+        DownloadJob job = dummyJob();
+
+        // Finished successfully, but nothing exists at outputFilePath
+        job.progress = 1.0;
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(410);
+    }
+
+    @Test
+    public void serveOutputShouldAttachOutputFilename(@TempDir Path tempDir) throws IOException {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        DownloadJob job = new DownloadJob(request, filePrefix, tempDir.toString());
+
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeaderString("Content-Disposition"))
+            .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
+    }
+
+    @Test
+    public void cancellingFailedJobShouldNotMaskTheFailure() {
+        DownloadJob job = dummyJob();
+
+        // A failed job never reaches progress 1.0, so it still looks "processing"
+        job.error = "something broke";
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.cancelDownload(job.ID);
+
+        // The failure is the more useful thing to report, and cancelling
+        // something that already stopped should not change what is reported.
+        Response response = downloadResource.serveOutput(job.ID);
+        assertThat(response.getStatus()).isEqualTo(500);
+    }
 }
