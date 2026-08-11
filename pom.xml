@@ -106,7 +106,8 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>postgresql</artifactId>
-      <version>1.19.8</version>
+      <!-- Version managed by quarkus-universe-bom (1.20.1), which is what
+           Quarkus Dev Services is built against. Do not pin independently. -->
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -142,6 +143,10 @@
               <goal>test</goal>
             </goals>
             <configuration>
+              <!-- Overrides the plugin-level excludedGroups, which this execution
+                   would otherwise inherit and which would exclude every test that
+                   'groups' selects here. Do not remove: without it this execution
+                   silently runs zero tests. -->
               <excludedGroups>!integration</excludedGroups>
               <groups>integration</groups>
             </configuration>
