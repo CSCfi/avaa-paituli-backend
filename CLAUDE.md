@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this service is
 
-Backend for CSC's PaITuli geospatial data portal. A Quarkus 3.38.3 / Java 21 REST service with two
+Backend for CSC's PaITuli geospatial data portal. A Quarkus 3.38.3 / Java 17 REST service with two
 responsibilities:
 
 1. Serve a localized (Finnish/English) catalogue of geodata datasets from Postgres.
@@ -16,8 +16,9 @@ Roughly 1,000 lines of main source across 18 classes. Artifact version is 1.0.2 
 ## Commands
 
 > `./mvnw test` is verified in this repo (30 tests green). `./mvnw verify` was confirmed green by
-> the developer locally on JDK 21, 2026-08-24, after the Quarkus 3.38.3 / Testcontainers 2.x
-> upgrade. The packaging commands are read off `pom.xml` and the README, not yet executed.
+> the developer locally on 2026-08-24, after the Quarkus 3.38.3 / Testcontainers 2.x upgrade. Both
+> ran on a JDK 21 toolchain against the Java 17 compile target. The packaging commands are read off
+> `pom.xml` and the README, not yet executed.
 
 ```bash
 ./mvnw quarkus:dev          # dev mode, port 8080, live reload
@@ -58,7 +59,10 @@ runs zero tests.
 
 ## Local setup
 
-1. JDK 21+ and Docker (for the Testcontainers Postgres used by integration tests).
+1. JDK 17+ and Docker (for the Testcontainers Postgres used by integration tests). The build
+   targets 17 via `maven.compiler.release`, so a newer JDK compiles it fine. Raising the target to
+   21 is gated on GeoServer, which runs on the same host and needs a Java 17 runtime — Quarkus
+   3.38 itself requires only 17.
 2. Create `/tmp/paituli_in` and `/tmp/paituli_out` — the `%dev` input and output directories.
 3. `DB_USERNAME`, `DB_PASSWORD`, `DB_CONN_URL` (host:port; `/paituli` is appended) must be set —
    exported, or in `.env`, which is read automatically by Quarkus dev mode.

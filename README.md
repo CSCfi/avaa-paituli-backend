@@ -5,14 +5,18 @@ If you want to learn more about Quarkus, please visit its website: https://quark
 
 ## Development setup
 
-1. Install JDK 17, Maven 3.6.3 or newer
+1. Install JDK 17 or newer. Use the bundled `./mvnw` wrapper rather than a system Maven.
+   The build targets Java 17 (`maven.compiler.release`), so a newer JDK builds it fine.
 2. Create directories `/tmp/paituli_in` and `/tmp/paituli_out`. They are used for download package input and output.
 Alternatively you can override them with the environment variables, see Overriding settings below.
 3. Set environment variables `DB_USERNAME`, `DB_PASSWORD` and `DB_CONN_URL` for the database connection.
-3. Run the application in development mode:
+4. Run the application in development mode:
 ```
 ./mvnw quarkus:dev
 ```
+
+If you invoke your own Maven instead of the wrapper, note that `quarkus-maven-plugin` 3.38.3
+declares a minimum of Maven 3.9.16. The wrapper currently pins 3.9.7, which still works.
 
 ### Overriding settings
 
@@ -42,23 +46,18 @@ To run the integration tier on its own:
 ./mvnw test-compile surefire:test@integration-tests
 ```
 
-### Docker API version
-
-Testcontainers 1.x bundles a docker-java that falls back to Docker API version 1.32 rather than negotiating with the daemon.
-`src/test/resources/docker-java.properties` pins the version to work around this.
-If `verify` still fails on the API version, the pin is outside your daemon's supported range.
-Check yours with `docker version --format '{{.Server.APIVersion}}'` and adjust.
-If `verify`still complains, check that you don't have a `~/.docker-java.properties` overriding the repo's setting. 
-
 ## Packaging and running the application
 
 The application is packageable using `./mvnw package`.
-It produces the executable `paituli-1.0.0-SNAPSHOT-runner.jar` file in `/target` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `target/lib` directory.
+It produces a fast-jar in `target/quarkus-app/`, launched with `java -jar target/quarkus-app/quarkus-run.jar`.
+Be aware that it’s not an _über-jar_ — the dependencies live alongside it in `target/quarkus-app/lib/`,
+so the whole `target/quarkus-app/` directory has to be deployed.
+
+Note that `./mvnw package` runs only the unit tier, not the integration tests.
 
 ## Creating a native executable
 
 You can create a native executable using: `./mvnw package -Pnative`.
 Or you can use Docker to build the native executable using: `./mvnw package -Pnative -Dquarkus.native.container-build=true`.
-You can then execute your binary: `./target/paituli-1.0.0-SNAPSHOT-runner`
+You can then execute your binary: `./target/paituli-backend-1.0.2-runner`
 If you want to learn more about building native executables, please consult https://quarkus.io/guides/building-native-image-guide 
