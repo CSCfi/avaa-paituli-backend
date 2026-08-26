@@ -40,6 +40,10 @@ public class DownloadJob {
 
     public boolean processing() { return this.progress < 1.0; }
 
+    // An empty string means no error. Null is tolerated defensively: it means
+    // processing failed with an exception that carried no message.
+    public boolean failed() { return this.error == null || !this.error.isEmpty(); }
+
     @Override
     public String toString()
     {
