@@ -1,5 +1,6 @@
 package fi.csc.avaa.paituli.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -80,38 +82,22 @@ public class DownloadServiceTest {
         assert(stored).equals(job);
     }
 
-
-    /*
     @Test
-    public void shouldCallPackageGeneratorWhenDownloadTypeIsZip() throws ExecutionException, InterruptedException {
-        //verifyDownload(DownloadType.ZIP);
+    public void createdJobShouldBeDispatchedToTheGenerator() {
+        interceptAsyncJobProcessing();
+        Mockito.doNothing().when(downloadGenerator).processJob(any(DownloadJob.class));
+
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+
+        DownloadJob job = service.createDownloadJob(request);
+
+        // The job the caller gets back must be the one handed to the worker
+        Mockito.verify(downloadGenerator).processJob(job);
     }
 
     @Test
-    public void shouldCallUrlListGeneratorWhenDownloadTypeIsList() throws ExecutionException, InterruptedException {
-        //verifyDownload(DownloadType.LIST);
+    public void unknownJobIdShouldReturnNull() {
+        assertThat(service.getJob("no-such-job")).isNull();
     }
-
-    public void verifyDownload(DownloadType downloadType)
-            throws ExecutionException, InterruptedException {
-        final String downloadUrl = "https://avaa.tdata.fi/tmp/file.zip";
-        final List<String> filePaths = Arrays.asList("test1.zip", "test2.zip");
-        final DownloadRequest request = new DownloadRequest();
-        request.downloadType = downloadType;
-        request.filePaths = filePaths;
-
-        Mockito.when(downloadGenerator.generate(request))
-                .thenReturn(downloadUrl);
-
-        CompletableFuture<String> future = service.generateDownload(request);
-        String result = future.get();
-
-        assertThat(result).isEqualTo(downloadUrl);
-
-        Mockito.verify(downloadGenerator)
-                .generate(request);
-        Mockito.verify(logService)
-                .log(request);
-    }
-    */
 }

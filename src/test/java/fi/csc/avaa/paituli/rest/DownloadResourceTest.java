@@ -6,6 +6,7 @@ import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.service.DownloadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -13,6 +14,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import jakarta.ws.rs.core.Response;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,5 +52,143 @@ public class DownloadResourceTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> entity = (Map<String, Object>) response.getEntity();
         assertThat(entity.get("message")).isEqualTo("Job created");
+    }
+
+    // Shorthand for a job that is not tied to a real output directory
+    private DownloadJob dummyJob() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        return new DownloadJob(request, filePrefix, outputPath);
+    }
+
+    @Test
+    public void shouldReportFailureWhenErrorHasNoMessage() {
+        DownloadJob job = dummyJob();
+
+        // DownloadGenerator assigns err.getMessage(), which is null for any
+        // exception constructed without one (e.g. a bare NPE).
+        job.error = null;
+        job.progress = 1.0;
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        // The job failed, so it must be reported as a failure rather than
+        // throwing while building the response.
+        assertThat(response.getStatus()).isEqualTo(500);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entity = (Map<String, Object>) response.getEntity();
+        assertThat(entity.get("error")).isNotNull();
+    }
+
+    @Test
+    public void cancellingCompletedJobShouldNotDestroyItsOutput(@TempDir Path tempDir)
+            throws IOException {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        DownloadJob job = new DownloadJob(request, filePrefix, tempDir.toString());
+
+        // The job finished and its output is on disk
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.cancelDownload(job.ID);
+
+        // A cancel arriving after completion must not deny access to a package
+        // that is complete and still on disk.
+        Response response = downloadResource.serveOutput(job.ID);
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    public void statusShouldReportCancellation() {
+        DownloadJob job = dummyJob();
+
+        // processJob never sets progress to 1.0 for a cancelled job, so without
+        // an explicit flag the client sees a job frozen part-way forever.
+        job.progress = 0.4;
+        job.cancelled = true;
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.getStatus(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entity = (Map<String, Object>) response.getEntity();
+        assertThat(entity.get("cancelled")).isEqualTo(true);
+    }
+
+    @Test
+    public void unknownJobShouldBeNotFoundOnEveryEndpoint() {
+        Mockito.when(downloadService.getJob("no-such-job")).thenReturn(null);
+
+        assertThat(downloadResource.getStatus("no-such-job").getStatus()).isEqualTo(404);
+        assertThat(downloadResource.cancelDownload("no-such-job").getStatus()).isEqualTo(404);
+        assertThat(downloadResource.serveOutput("no-such-job").getStatus()).isEqualTo(404);
+    }
+
+    @Test
+    public void serveOutputShouldConflictWhileStillProcessing() {
+        DownloadJob job = dummyJob();
+        job.progress = 0.5;
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(409);
+    }
+
+    @Test
+    public void serveOutputShouldReportGoneWhenOutputWasCleaned() {
+        DownloadJob job = dummyJob();
+
+        // Finished successfully, but nothing exists at outputFilePath
+        job.progress = 1.0;
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(410);
+    }
+
+    @Test
+    public void serveOutputShouldAttachOutputFilename(@TempDir Path tempDir) throws IOException {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        DownloadJob job = new DownloadJob(request, filePrefix, tempDir.toString());
+
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeaderString("Content-Disposition"))
+            .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
+    }
+
+    @Test
+    public void cancellingFailedJobShouldNotMaskTheFailure() {
+        DownloadJob job = dummyJob();
+
+        // A failed job never reaches progress 1.0, so it still looks "processing"
+        job.error = "something broke";
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.cancelDownload(job.ID);
+
+        // The failure is the more useful thing to report, and cancelling
+        // something that already stopped should not change what is reported.
+        Response response = downloadResource.serveOutput(job.ID);
+        assertThat(response.getStatus()).isEqualTo(500);
     }
 }

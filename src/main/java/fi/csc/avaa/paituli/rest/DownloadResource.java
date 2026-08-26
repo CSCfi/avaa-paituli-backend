@@ -38,7 +38,8 @@ public class DownloadResource {
             "message", message,
             "ID", job.ID,
             "progress", job.progress,
-            "error", job.error
+            "error", job.error == null ? "" : job.error,
+            "cancelled", job.cancelled
         );
     }
 
@@ -67,7 +68,13 @@ public class DownloadResource {
         DownloadJob job = downloadService.getJob(jobId);
         if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
 
-        // We don't care if the job has already completed or not
+        // Cancelling a job that has already stopped is a no-op: for a completed
+        // job it would deny access to a package that is still on disk, and for
+        // a failed one it would hide the failure behind a cancellation.
+        if (!job.processing() || job.failed()) {
+            return Response.ok(jobResponse(job, "Job is no longer processing")).build();
+        }
+
         job.cancelled = true;
         return Response.ok(jobResponse(job, "Job will be cancelled")).build();
     }
@@ -87,7 +94,7 @@ public class DownloadResource {
                 .build();
         }
 
-        if (!job.error.isEmpty()) {
+        if (job.failed()) {
             // Something went wrong during the processing
             return Response
                 .status(Response.Status.INTERNAL_SERVER_ERROR)
