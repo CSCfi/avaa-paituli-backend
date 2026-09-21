@@ -27,8 +27,10 @@ Single test class / method:
 Targeting a single integration test needs `-DfailIfNoSpecifiedTests=false`, otherwise the default
 execution fails on finding no matching unit test.
 
-A green `./mvnw test` prints **four** stack traces — negative-path tests in `DownloadGeneratorTest`
-hitting `LOG.error` in `DownloadGenerator.processJob`. Expected; a fifth means something broke.
+A green `./mvnw test` prints **five** stack traces — four from negative-path tests in
+`DownloadGeneratorTest` hitting `LOG.error` in `DownloadGenerator.processJob`, one from
+`BuildInfoServiceTest` feeding invalid JSON to `BuildInfoService`. Expected; a sixth means something
+broke.
 
 ## Local setup
 
@@ -47,11 +49,12 @@ Populating the file is developer's job. If you suspect a credential problem, bes
 
 ```
 fi.csc.avaa.paituli
-├── rest/          DatasetResource, DownloadResource      JAX-RS entry points
-├── service/       DatasetService, DownloadService, LogService
+├── rest/          DatasetResource, DownloadResource,     JAX-RS entry points
+│               BuildInfoResource
+├── service/       DatasetService, DownloadService, LogService, BuildInfoService
 ├── download/      DownloadGenerator                      orchestration
 │   └── io/        FileOperations, FileSizeOperations     filesystem + zip
-├── model/         DownloadRequest, DownloadJob, LocalizedDataset
+├── model/         DownloadRequest, DownloadJob, LocalizedDataset, BuildInfo
 ├── entity/        Dataset, LogEvent                      Panache entities
 └── constants/     Constants, DownloadType
 ```

@@ -39,3 +39,6 @@ quarkus.log*
 
 # Environment file 
 .env
+
+# Build information generate by ansible
+build-info.json

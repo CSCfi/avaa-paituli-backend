@@ -18,6 +18,7 @@ public final class Constants {
     public static final String MSG_URL_LIST_EMAIL_SUBJECT = "url_list_email_subject";
     public static final String MSG_URL_LIST_EMAIL_BODY_TEMPLATE = "url_list_email_body_template";
 
+    public static final String PATH_BUILD_INFO = "/build-info";
     public static final String PATH_DATASETS = "/datasets/{locale}";
     public static final String PATH_DOWNLOAD = "/download";
 }
