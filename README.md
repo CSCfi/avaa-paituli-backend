@@ -5,8 +5,8 @@ If you want to learn more about Quarkus, please visit its website: https://quark
 
 ## Development setup
 
-1. Install JDK 17 or newer. Use the bundled `./mvnw` wrapper rather than a system Maven.
-   The build targets Java 17 (`maven.compiler.release`), so a newer JDK builds it fine.
+1. Install JDK 21 or newer. Use the bundled `./mvnw` wrapper rather than a system Maven.
+   The build targets Java 21 (`maven.compiler.release`), which is what production runs.
 2. Create directories `/tmp/paituli_in` and `/tmp/paituli_out`. They are used for download package input and output.
 Alternatively you can override them with the environment variables, see Overriding settings below.
 3. Set environment variables `DB_USERNAME`, `DB_PASSWORD` and `DB_CONN_URL` for the database connection.
