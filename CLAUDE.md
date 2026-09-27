@@ -2,7 +2,7 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this service is
-Backend for CSC's Paituli geospatial data portal. A Quarkus 3.38.3 / Java 17 REST service with two
+Backend for CSC's Paituli geospatial data portal. A Quarkus 3.38.3 / Java 21 REST service with two
 responsibilities:
 1. Serve a localized (Finnish/English) catalogue of geodata datasets from Postgres.
 2. Package files from a mounted filesystem into either a ZIP archive or a plaintext list of FTP/HTTP
@@ -34,10 +34,8 @@ broke.
 
 ## Local setup
 
-1. JDK 17+ and Docker (for the Testcontainers Postgres used by integration tests). The build
-   targets 17 via `maven.compiler.release`, so a newer JDK compiles it fine. Raising the target to
-   21 is gated on GeoServer, which runs on the same host and needs a Java 17 runtime — Quarkus
-   3.38 itself requires only 17.
+1. JDK 21+ and Docker (for the Testcontainers Postgres used by integration tests). The build
+   targets 21 via `maven.compiler.release`, matching the production runtime.
 2. Create `/tmp/paituli_in` and `/tmp/paituli_out` — the `%dev` input and output directories.
 3. `DB_USERNAME`, `DB_PASSWORD`, `DB_CONN_URL` (host:port; `/paituli` is appended) must be set —
    exported, or in `.env`, which is read automatically by Quarkus dev mode.
