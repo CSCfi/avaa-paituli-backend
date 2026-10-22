@@ -32,6 +32,10 @@ public class FileOperations {
 
     private static final Logger LOG = Logger.getLogger(FileOperations.class);
 
+    // Cancellation is checked once per chunk, so this bounds how much
+    // gets copied after a job is cancelled
+    private static final int COPY_BUFFER_SIZE = 64 * 1024;
+
     @ConfigProperty(name = "paituli.download.inputPath")
     String inputPath;
 
@@ -83,8 +87,10 @@ public class FileOperations {
             @Override
             public ZipProgress next() {
                 String path = pathsIterator.next();
-                copyPathToZip(path, zout);
-                return new ZipProgress(path, ++numZipped / (double)filePaths.size());
+                copyPathToZip(path, zout, job);
+                // A path interrupted by cancellation was not fully zipped
+                if (!job.cancelled) numZipped++;
+                return new ZipProgress(path, numZipped / (double)filePaths.size());
             }
 
             private void close()
@@ -103,23 +109,24 @@ public class FileOperations {
         }
     }
 
-    private void copyPathToZip(String absolutePath, ZipOutputStream zout) {
+    private void copyPathToZip(String absolutePath, ZipOutputStream zout, DownloadJob job) {
         if (Files.isDirectory(Paths.get(absolutePath))) {
-            copyDirectoryToZip(absolutePath, zout);
+            copyDirectoryToZip(absolutePath, zout, job);
         } else {
-            copyFileToZip(absolutePath, zout);
+            copyFileToZip(absolutePath, zout, job);
         }
     }
 
-    private void copyDirectoryToZip(String absolutePath, ZipOutputStream zout)  {
+    private void copyDirectoryToZip(String absolutePath, ZipOutputStream zout, DownloadJob job)  {
         try (Stream<Path> subPaths = Files.list(Paths.get(absolutePath))) {
             subPaths
+                    .takeWhile(subPath -> !job.cancelled)
                     .map(Path::toAbsolutePath)
                     .forEach(subPath -> {
                         if (Files.isDirectory(subPath)) {
-                            copyDirectoryToZip(subPath.toString(), zout);
+                            copyDirectoryToZip(subPath.toString(), zout, job);
                         } else {
-                            copyFileToZip(subPath.toString(), zout);
+                            copyFileToZip(subPath.toString(), zout, job);
                         }
                     });
         } catch (IOException e) {
@@ -127,25 +134,25 @@ public class FileOperations {
         }
     }
 
-    private void copyFileToZip(String absolutePath, ZipOutputStream zout) {
+    private void copyFileToZip(String absolutePath, ZipOutputStream zout, DownloadJob job) {
         if (absolutePath.endsWith(Constants.EXTENSION_ZIP)) {
-            copyZipContentsToZip(absolutePath, zout);
+            copyZipContentsToZip(absolutePath, zout, job);
         } else {
-            copyRegularFileToZip(absolutePath, zout);
+            copyRegularFileToZip(absolutePath, zout, job);
         }
     }
 
-    private void copyZipContentsToZip(String absolutePath, ZipOutputStream zout) {
+    private void copyZipContentsToZip(String absolutePath, ZipOutputStream zout, DownloadJob job) {
         zout.setLevel(Deflater.BEST_COMPRESSION);
         String entryPath = FilenameUtils.removeExtension(zipEntryNameFor(absolutePath));
         try (ZipFile source = new ZipFile(absolutePath, StandardCharsets.ISO_8859_1)) {
             Enumeration<? extends ZipEntry> sourceEntries = source.entries();
-            while (sourceEntries.hasMoreElements()) {
+            while (sourceEntries.hasMoreElements() && !job.cancelled) {
                 ZipEntry sourceEntry = sourceEntries.nextElement();
                 ZipEntry entry = new ZipEntry(entryPath + "/" + sourceEntry.getName());
                 zout.putNextEntry(entry);
                 try (InputStream is = source.getInputStream(sourceEntry)) {
-                    is.transferTo(zout);
+                    copyUntilCancelled(is, zout, job);
                 }
                 zout.closeEntry();
             }
@@ -154,17 +161,36 @@ public class FileOperations {
         }
     }
 
-    private void copyRegularFileToZip(String absolutePath, ZipOutputStream zout) {
+    private void copyRegularFileToZip(String absolutePath, ZipOutputStream zout, DownloadJob job) {
         int compressionLevel = absolutePath.endsWith(Constants.EXTENSION_JP2)
                 ? Deflater.NO_COMPRESSION
                 : Deflater.BEST_COMPRESSION;
         zout.setLevel(compressionLevel);
         try {
             zout.putNextEntry(new ZipEntry(zipEntryNameFor(absolutePath)));
-            Files.copy(Paths.get(absolutePath), zout);
+            try (InputStream is = openFile(absolutePath)) {
+                copyUntilCancelled(is, zout, job);
+            }
             zout.closeEntry();
         } catch (IOException e) {
             throw new FileOperationException(e);
+        }
+    }
+
+    // Package-private so tests can control how the input is read
+    InputStream openFile(String absolutePath) throws IOException {
+        return Files.newInputStream(Paths.get(absolutePath));
+    }
+
+    // Like InputStream.transferTo, but stops early once the job is cancelled.
+    // The entry being written is left truncated, which is fine: the output
+    // of a cancelled job is never served.
+    private void copyUntilCancelled(InputStream in, ZipOutputStream zout, DownloadJob job)
+            throws IOException {
+        byte[] buffer = new byte[COPY_BUFFER_SIZE];
+        int read;
+        while (!job.cancelled && (read = in.read(buffer)) != -1) {
+            zout.write(buffer, 0, read);
         }
     }
 
