@@ -28,6 +28,16 @@ public class DownloadJobTest {
     }
 
     @Test
+    public void newJobShouldCountAsJustSeen() {
+        long before = System.nanoTime();
+        DownloadJob job = jobOfType(DownloadType.ZIP);
+
+        // Otherwise the keep-alive sweep could cancel a job before the
+        // client has had a chance to poll it even once
+        assertThat(job.lastSeen).isGreaterThanOrEqualTo(before);
+    }
+
+    @Test
     public void processingShouldEndOnlyAtFullProgress() {
         DownloadJob job = jobOfType(DownloadType.ZIP);
 
