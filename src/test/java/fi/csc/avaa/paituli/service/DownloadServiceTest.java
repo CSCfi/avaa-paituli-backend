@@ -7,11 +7,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -278,5 +281,60 @@ public class DownloadServiceTest {
         // deferred to FINDINGS #10
         assertThat(job.cancelled).isTrue();
         assertThat(service.getJob(job.ID)).isSameAs(job);
+    }
+
+    @Test
+    public void jobCancelledWhileWaitingShouldNeverRun() {
+        DownloadJob job = storedJob();
+        service.pollJob(job.ID);
+
+        ArgumentCaptor<Runnable> queued = ArgumentCaptor.forClass(Runnable.class);
+        Mockito.verify(managedExecutor).runAsync(queued.capture());
+
+        // Cancelled before its turn comes
+        service.cancel(job);
+        queued.getValue().run();
+
+        Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
+    }
+
+    @Test
+    public void jobsBeyondTheCapShouldWaitAtZeroProgress() throws InterruptedException {
+        // A real executor instead of the mock, capped at two jobs
+        service.maxConcurrentJobs = 2;
+        service.init();
+
+        // Each job reports some progress, then holds its slot until released
+        CountDownLatch running = new CountDownLatch(3);
+        CountDownLatch release = new CountDownLatch(1);
+        Mockito.doAnswer(invocation -> {
+            DownloadJob job = invocation.getArgument(0);
+            job.progress = 0.5;
+            running.countDown();
+            release.await(5, TimeUnit.SECONDS);
+            return null;
+        }).when(downloadGenerator).processJob(any(DownloadJob.class));
+
+        try {
+            DownloadJob first = storedJob();
+            DownloadJob second = storedJob();
+            DownloadJob third = storedJob();
+            service.pollJob(first.ID);
+            service.pollJob(second.ID);
+            service.pollJob(third.ID);
+
+            // Two jobs run, and the third doesn't start while they hold the slots
+            assertThat(running.await(500, TimeUnit.MILLISECONDS)).isFalse();
+            assertThat(running.getCount()).isEqualTo(1);
+            assertThat(third.progress).isZero();
+
+            // Once a slot frees up, the waiting job gets its turn
+            release.countDown();
+            assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(third.progress).isEqualTo(0.5);
+        } finally {
+            release.countDown();
+            service.shutdown();
+        }
     }
 }
