@@ -49,4 +49,14 @@ public class DownloadService {
     public DownloadJob getJob(String jobId) {
         return jobs.get(jobId);
     }
+
+    // Marks a job for cancellation and returns whether it was marked.
+    // Cancelling a job that has already stopped is a no-op: for a completed
+    // job it would deny access to a package that is still on disk, and for
+    // a failed one it would hide the failure behind a cancellation.
+    public boolean cancel(DownloadJob job) {
+        if (!job.processing() || job.failed()) return false;
+        job.cancelled = true;
+        return true;
+    }
 }
