@@ -12,6 +12,8 @@ import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.scheduler.Scheduled;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -22,9 +24,6 @@ public class DownloadService {
     
     @Inject
     DownloadGenerator downloadGenerator;
-
-    @Inject
-    ManagedExecutor managedExecutor;
 
     @ConfigProperty(name = "paituli.download.filePrefix")
     public String filePrefix;
@@ -37,6 +36,28 @@ public class DownloadService {
     @ConfigProperty(name = "paituli.download.keepAliveTimeout")
     Duration keepAliveTimeout;
 
+    // How many jobs may be processed at once; the rest wait for their turn
+    @ConfigProperty(name = "paituli.download.maxConcurrentJobs")
+    int maxConcurrentJobs;
+
+    // Runs at most maxConcurrentJobs jobs at a time and queues the rest in
+    // order. Built in init() rather than injected, since the cap comes from config.
+    ManagedExecutor managedExecutor;
+
+    @PostConstruct
+    void init() {
+        managedExecutor = ManagedExecutor.builder()
+            .maxAsync(maxConcurrentJobs)
+            .maxQueued(-1)
+            .build();
+    }
+
+    // Jobs don't survive a restart anyway, so queued ones are dropped and
+    // running ones interrupted
+    @PreDestroy
+    void shutdown() {
+        managedExecutor.shutdownNow();
+    }
 
     // Job storage (could later move to DB/Redis)
     private final Map<String, DownloadJob> jobs = new ConcurrentHashMap<>();
@@ -61,9 +82,10 @@ public class DownloadService {
     private void start(DownloadJob job) {
         if (job.cancelled || !job.started.compareAndSet(false, true)) return;
 
-        // Alternatively, here we could implement scheduling, priority, etc.
+        // While maxConcurrentJobs are running, the job waits in the executor's
+        // queue with progress at 0. A job cancelled while waiting never runs.
         managedExecutor.runAsync(() -> {
-            downloadGenerator.processJob(job);
+            if (!job.cancelled) downloadGenerator.processJob(job);
         });
     }
 
