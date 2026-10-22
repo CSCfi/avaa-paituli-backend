@@ -59,28 +59,31 @@ fi.csc.avaa.paituli
 
 ### Async download job lifecycle
 
-`POST /download` returns immediately: `DownloadService.createDownloadJob` puts a `DownloadJob` (UUID
-id, plus a separate 8-digit random output filename) into a `ConcurrentHashMap` field on the
-`@ApplicationScoped` service, then `managedExecutor.runAsync(() -> processJob(job))` and discards the
-future. **Job state is in-process only** — it does not survive restart and breaks behind replicas.
+`POST /download` returns immediately: Puts a `DownloadJob` into a `ConcurrentHashMap` field on the
+service and does nothing else. Processing starts on the job's first status poll and discards the future.
+The executor is built in `DownloadService.init()` with a configrable `maxAsync` set to and an unbounded queue,
+so jobs beyond the cap wait for their turn;
+Every `DownloadService.getJob` refreshes `job.lastSeen`, so simple status polls from the frontend acts
+as a keep-alive. A `@Scheduled` sweep cancels processing jobs not seen within a configrable timeout.
 
-State is three mutable `volatile` fields on `DownloadJob`, not an enum: `progress` (double, and
-`processing()` is defined as `progress < 1.0`), `error` (empty string means none), and `cancelled`
-(set by the REST layer, polled by the zipper iterator). `DownloadResource.serveOutput` reads them in
-a fixed precedence — cancelled → error → still processing → output file missing → serve.
+Currently, **Job state is in-process only** — it does not survive restart and breaks behind replicas.
+State is mutable fields on `DownloadJob`, which `DownloadResource.serveOutput` reads in a
+fixed precedence — cancelled → error → still processing → output file missing → serve.
 
-### Path resolution and zipping
+### Path resolution, zipping and output cleaning
 
 `collectAbsolutePaths` prefixes each client-supplied `filePath` with the configured `inputPath`. A
 `*` switches to wildcard mode: `findMatchingFiles` splits on the **last** `/` and lists that one
 directory — no recursion, no wildcards in directory segments. A wildcard matching nothing is fatal;
 a plain path that doesn't exist is only logged and skipped.
 
+ZIP generation runs a size-limit pre-check, then `FileOperations.zipper`, whose iterator checks
+`job.cancelled` in `hasNext()`, and the copy helpers check it per directory, per nested-zip and per
+64 KiB chunk, so a cancel takes effect mid-way; an interrupted path
+does not count towards `progress`. 
+
 Output in `outputPath` is cleaned by a process **outside this service**, on a schedule it cannot
-consult, so any output may vanish at any time — that is what `serveOutput`'s missing-file branch is
-for. ZIP generation runs a 15 GiB uncompressed pre-check, then `FileOperations.zipper`, whose
-iterator checks `job.cancelled` in `hasNext()` — the only cancellation mechanism. `copyFileToZip`
-re-packs nested `.zip` inputs entry-by-entry as ISO-8859-1 and stores `.jp2` uncompressed.
+consult, so output may vanish at any time — that is what `serveOutput`'s missing-file branch is for.
 
 ## Conventions
 
