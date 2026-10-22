@@ -124,7 +124,7 @@ public class DownloadResourceTest {
         job.progress = 0.4;
         job.cancelled = true;
 
-        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+        Mockito.when(downloadService.pollJob(job.ID)).thenReturn(job);
 
         Response response = downloadResource.getStatus(job.ID);
 
@@ -136,6 +136,7 @@ public class DownloadResourceTest {
 
     @Test
     public void unknownJobShouldBeNotFoundOnEveryEndpoint() {
+        Mockito.when(downloadService.pollJob("no-such-job")).thenReturn(null);
         Mockito.when(downloadService.getJob("no-such-job")).thenReturn(null);
 
         assertThat(downloadResource.getStatus("no-such-job").getStatus()).isEqualTo(404);
