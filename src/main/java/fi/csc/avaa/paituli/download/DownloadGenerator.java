@@ -75,6 +75,9 @@ public class DownloadGenerator {
         if (filesSize > MAXSIZE ) {
             throw new FileSizesException(filesSize+" "+job.request.data_id);
         }
+        // A job cancelled during the size check is not zipped, which would
+        // otherwise leave an empty archive behind
+        if (job.cancelled) return;
         for (ZipProgress zip : fileOperations.zipper(job, paths))
         {
             job.progress = zip.progress(); 

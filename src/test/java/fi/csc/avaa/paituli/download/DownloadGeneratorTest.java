@@ -26,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.download.io.FileOperations;
+import fi.csc.avaa.paituli.download.io.FileSizeOperations;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.service.LogService;
@@ -101,6 +102,28 @@ public class DownloadGeneratorTest {
                 .endsWith(DownloadType.ZIP.getExtension());
     }
 
+    @Test
+    public void jobCancelledDuringSizeCheckShouldNotBeZipped() {
+        final String filePath = "file.zip";
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList(filePath);
+
+        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
+                .thenReturn(true);
+
+        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        generator.fileSizeOperations = new FileSizeOperations() {
+            @Override
+            public long count(List<String> absolutePaths) {
+                job.cancelled = true;
+                return 0;
+            }
+        };
+        generator.processJob(job);
+
+        Mockito.verify(fileOperations, Mockito.never()).zipper(any(), anyList());
+    }
 
     @Test
     public void fileFtpUrlShouldBeWrittenToOutput() {
