@@ -100,4 +100,44 @@ public class DownloadServiceTest {
     public void unknownJobIdShouldReturnNull() {
         assertThat(service.getJob("no-such-job")).isNull();
     }
+
+    // Shorthand for a job that is not tied to a real output directory
+    private DownloadJob dummyJob() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        return new DownloadJob(request, filePrefix, outputPath);
+    }
+
+    @Test
+    public void processingJobShouldBeCancelled() {
+        DownloadJob job = dummyJob();
+        job.progress = 0.4;
+
+        assertThat(service.cancel(job)).isTrue();
+        assertThat(job.cancelled).isTrue();
+    }
+
+    @Test
+    public void cancellingCompletedJobShouldNotDestroyItsOutput() {
+        DownloadJob job = dummyJob();
+        job.progress = 1.0;
+
+        // A cancel arriving after completion must not deny access to a package
+        // that is complete and still on disk.
+        assertThat(service.cancel(job)).isFalse();
+        assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void cancellingFailedJobShouldNotMaskTheFailure() {
+        DownloadJob job = dummyJob();
+
+        // A failed job never reaches progress 1.0, so it still looks "processing"
+        job.error = "something broke";
+
+        // The failure is the more useful thing to report, and cancelling
+        // something that already stopped should not change what is reported.
+        assertThat(service.cancel(job)).isFalse();
+        assertThat(job.cancelled).isFalse();
+    }
 }

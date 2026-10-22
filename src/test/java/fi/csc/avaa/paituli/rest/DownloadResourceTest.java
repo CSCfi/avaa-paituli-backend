@@ -83,24 +83,36 @@ public class DownloadResourceTest {
     }
 
     @Test
-    public void cancellingCompletedJobShouldNotDestroyItsOutput(@TempDir Path tempDir)
-            throws IOException {
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        DownloadJob job = new DownloadJob(request, filePrefix, tempDir.toString());
-
-        // The job finished and its output is on disk
-        job.progress = 1.0;
-        Files.createFile(Path.of(job.outputFilePath));
+    public void cancelShouldBeDelegatedToTheService() {
+        DownloadJob job = dummyJob();
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+        Mockito.when(downloadService.cancel(job)).thenReturn(true);
 
-        downloadResource.cancelDownload(job.ID);
+        Response response = downloadResource.cancelDownload(job.ID);
 
-        // A cancel arriving after completion must not deny access to a package
-        // that is complete and still on disk.
-        Response response = downloadResource.serveOutput(job.ID);
+        // Whether a job may be cancelled is the service's decision
+        Mockito.verify(downloadService).cancel(job);
         assertThat(response.getStatus()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entity = (Map<String, Object>) response.getEntity();
+        assertThat(entity.get("message")).isEqualTo("Job will be cancelled");
+    }
+
+    @Test
+    public void cancelRefusedByTheServiceShouldStillSucceed() {
+        DownloadJob job = dummyJob();
+
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+        Mockito.when(downloadService.cancel(job)).thenReturn(false);
+
+        Response response = downloadResource.cancelDownload(job.ID);
+
+        // Cancelling a job that already stopped is a no-op, not an error
+        assertThat(response.getStatus()).isEqualTo(200);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> entity = (Map<String, Object>) response.getEntity();
+        assertThat(entity.get("message")).isEqualTo("Job is no longer processing");
     }
 
     @Test
@@ -173,22 +185,5 @@ public class DownloadResourceTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getHeaderString("Content-Disposition"))
             .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
-    }
-
-    @Test
-    public void cancellingFailedJobShouldNotMaskTheFailure() {
-        DownloadJob job = dummyJob();
-
-        // A failed job never reaches progress 1.0, so it still looks "processing"
-        job.error = "something broke";
-
-        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-
-        downloadResource.cancelDownload(job.ID);
-
-        // The failure is the more useful thing to report, and cancelling
-        // something that already stopped should not change what is reported.
-        Response response = downloadResource.serveOutput(job.ID);
-        assertThat(response.getStatus()).isEqualTo(500);
     }
 }
