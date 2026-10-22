@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 
+import java.time.Duration;
+
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +44,7 @@ public class DownloadServiceTest {
         // Dummy configs so we don't have to boot up testcontainers
         service.filePrefix = filePrefix;
         service.outputPath = outputPath;
+        service.keepAliveTimeout = Duration.ofSeconds(15);
     }
 
     public void interceptAsyncJobProcessing() {
@@ -129,6 +132,16 @@ public class DownloadServiceTest {
     }
 
     @Test
+    public void cancellingAlreadyCancelledJobShouldBeANoOp() {
+        DownloadJob job = dummyJob();
+        job.cancelled = true;
+
+        // A cancelled job never reaches progress 1.0, so it still looks
+        // "processing", but there is nothing left to cancel
+        assertThat(service.cancel(job)).isFalse();
+    }
+
+    @Test
     public void cancellingFailedJobShouldNotMaskTheFailure() {
         DownloadJob job = dummyJob();
 
@@ -139,5 +152,71 @@ public class DownloadServiceTest {
         // something that already stopped should not change what is reported.
         assertThat(service.cancel(job)).isFalse();
         assertThat(job.cancelled).isFalse();
+    }
+
+    // Shorthand for a job held by the service, so the keep-alive sweep sees it
+    private DownloadJob storedJob() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        return service.createDownloadJob(request);
+    }
+
+    private static long seconds(long seconds) {
+        return Duration.ofSeconds(seconds).toNanos();
+    }
+
+    @Test
+    public void lookingUpJobShouldMarkItAsSeen() {
+        DownloadJob job = storedJob();
+        job.lastSeen = System.nanoTime() - seconds(60);
+        long before = System.nanoTime();
+
+        service.getJob(job.ID);
+
+        assertThat(job.lastSeen).isGreaterThanOrEqualTo(before);
+    }
+
+    @Test
+    public void jobNotSeenWithinTimeoutShouldBeCancelled() {
+        DownloadJob job = storedJob();
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+        assertThat(job.cancelled).isTrue();
+    }
+
+    @Test
+    public void jobSeenWithinTimeoutShouldKeepRunning() {
+        DownloadJob job = storedJob();
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(14));
+
+        assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void lookingUpJobShouldKeepItFromBeingCancelled() {
+        DownloadJob job = storedJob();
+        job.lastSeen = System.nanoTime() - seconds(60);
+
+        // The frontend's status poll, arriving before the sweep
+        service.getJob(job.ID);
+        service.cancelAbandonedJobs(System.nanoTime());
+
+        assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void abandonedJobThatAlreadyStoppedShouldNotBeCancelled() {
+        DownloadJob completed = storedJob();
+        completed.progress = 1.0;
+        DownloadJob failed = storedJob();
+        failed.error = "something broke";
+
+        service.cancelAbandonedJobs(System.nanoTime() + seconds(60));
+
+        // The sweep follows the same policy as a cancel from the client
+        assertThat(completed.cancelled).isFalse();
+        assertThat(failed.cancelled).isFalse();
     }
 }

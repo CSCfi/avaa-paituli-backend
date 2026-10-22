@@ -18,6 +18,9 @@ public class DownloadJob {
     public volatile boolean cancelled;
     public volatile String error;
 
+    // When a client last asked about this job, as System.nanoTime()
+    public volatile long lastSeen;
+
     public DownloadJob(
         DownloadRequest request,
         String filePrefix,
@@ -36,6 +39,7 @@ public class DownloadJob {
 
         this.progress = 0;
         this.error = "";
+        this.lastSeen = System.nanoTime();
     }
 
     public boolean processing() { return this.progress < 1.0; }
