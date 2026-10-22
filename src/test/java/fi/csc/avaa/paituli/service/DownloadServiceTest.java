@@ -3,6 +3,8 @@ package fi.csc.avaa.paituli.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 
 import java.time.Duration;
 
@@ -86,7 +88,7 @@ public class DownloadServiceTest {
     }
 
     @Test
-    public void createdJobShouldBeDispatchedToTheGenerator() {
+    public void firstPollShouldDispatchJobToTheGenerator() {
         interceptAsyncJobProcessing();
         Mockito.doNothing().when(downloadGenerator).processJob(any(DownloadJob.class));
 
@@ -94,6 +96,11 @@ public class DownloadServiceTest {
         request.downloadType = DownloadType.ZIP;
 
         DownloadJob job = service.createDownloadJob(request);
+
+        // Creating a job alone does no work
+        Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
+
+        service.pollJob(job.ID);
 
         // The job the caller gets back must be the one handed to the worker
         Mockito.verify(downloadGenerator).processJob(job);
@@ -218,5 +225,58 @@ public class DownloadServiceTest {
         // The sweep follows the same policy as a cancel from the client
         assertThat(completed.cancelled).isFalse();
         assertThat(failed.cancelled).isFalse();
+    }
+
+    @Test
+    public void repeatedPollsShouldStartJobOnce() {
+        DownloadJob job = storedJob();
+
+        service.pollJob(job.ID);
+        service.pollJob(job.ID);
+        service.pollJob(job.ID);
+
+        Mockito.verify(managedExecutor, times(1)).runAsync(any(Runnable.class));
+    }
+
+    @Test
+    public void lookupsOtherThanPollShouldNotStartJob() {
+        DownloadJob job = storedJob();
+
+        // Cancel and download requests look the job up with getJob
+        service.getJob(job.ID);
+
+        Mockito.verify(managedExecutor, never()).runAsync(any(Runnable.class));
+    }
+
+    @Test
+    public void jobCancelledBeforeFirstPollShouldNeverStart() {
+        DownloadJob job = storedJob();
+
+        service.cancel(job);
+        service.pollJob(job.ID);
+
+        Mockito.verify(managedExecutor, never()).runAsync(any(Runnable.class));
+    }
+
+    @Test
+    public void abandonedJobThatNeverStartedShouldBeForgotten() {
+        DownloadJob job = storedJob();
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+        assertThat(service.getJob(job.ID)).isNull();
+    }
+
+    @Test
+    public void abandonedJobThatStartedShouldBeKept() {
+        DownloadJob job = storedJob();
+        service.pollJob(job.ID);
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+        // It may have output on disk; how long finished jobs are kept is
+        // deferred to FINDINGS #10
+        assertThat(job.cancelled).isTrue();
+        assertThat(service.getJob(job.ID)).isSameAs(job);
     }
 }

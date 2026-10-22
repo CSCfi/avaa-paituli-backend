@@ -50,11 +50,12 @@ public class DownloadResource {
         return Response.ok(jobResponse(job, "Job created")).build();
     }
 
-    // Returns the status of a download job 
+    // Returns the status of a download job. The first status poll is what
+    // starts processing the job.
     @GET
     @Path("/status/{jobId}")
     public Response getStatus(@PathParam("jobId") String jobId) {
-        DownloadJob job = downloadService.getJob(jobId);
+        DownloadJob job = downloadService.pollJob(jobId);
         if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
 
         // Job errors are included in the response 

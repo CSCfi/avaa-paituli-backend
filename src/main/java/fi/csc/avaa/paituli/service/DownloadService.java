@@ -41,19 +41,30 @@ public class DownloadService {
     // Job storage (could later move to DB/Redis)
     private final Map<String, DownloadJob> jobs = new ConcurrentHashMap<>();
 
-    // Creates a new download job, starts its thread and return the job 
+    // Creates and stores a new download job. Processing waits for the job's
+    // first status poll, so no work is done for a client that never shows up.
     public DownloadJob createDownloadJob(DownloadRequest request) {
-
-        // Create a job for the request and store it
         DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
         jobs.put(job.ID, job);
+        return job;
+    }
 
-        // Start processing immediately.
+    // Looks up a job for its client's status poll. The first poll starts
+    // processing; later ones only keep the job alive.
+    public DownloadJob pollJob(String jobId) {
+        DownloadJob job = getJob(jobId);
+        if (job != null) start(job);
+        return job;
+    }
+
+    // Starts processing at most once, and never for a job cancelled before it started
+    private void start(DownloadJob job) {
+        if (job.cancelled || !job.started.compareAndSet(false, true)) return;
+
         // Alternatively, here we could implement scheduling, priority, etc.
         managedExecutor.runAsync(() -> {
             downloadGenerator.processJob(job);
         });
-        return job;
     }
 
     // Looks up a job for a client. Any request about a job is a sign of life
@@ -88,5 +99,8 @@ public class DownloadService {
                 LOG.infof("%s Cancelled, client not seen for over %s", job, keepAliveTimeout);
             }
         }
+        // A job cancelled before it started has no output and nothing to
+        // report, so there is no reason to keep it
+        jobs.values().removeIf(job -> job.cancelled && !job.started.get());
     }
 }
