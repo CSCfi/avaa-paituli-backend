@@ -69,7 +69,7 @@ public class DownloadResource {
         DownloadJob job = downloadService.getJob(jobId);
         if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
 
-        if (!downloadService.cancel(job)) {
+        if (!downloadService.cancel(job, "requested by client")) {
             return Response.ok(jobResponse(job, "Job is no longer processing")).build();
         }
         return Response.ok(jobResponse(job, "Job will be cancelled")).build();
