@@ -90,7 +90,7 @@ consult, so output may vanish at any time — that is what `serveOutput`'s missi
 - Field injection with package-private `@Inject`; `@ApplicationScoped` beans.
 - DTOs and Panache entities use public fields, no getters. JSON binding is JSON-B
   (`quarkus-resteasy-jsonb`), not Jackson.
-- Logging is JBoss `org.jboss.logging.Logger`. `DatasetService` and `LogService` currently bypass it
-  for `printStackTrace`/`System.err` — follow the `Logger` convention in new code.
+- Logging is JBoss `org.jboss.logging.Logger`. `LogService` currently bypasses it for `System.err`
+  — follow the `Logger` convention in new code.
 - Bean Validation lives on `DownloadRequest` (`@NotEmpty`/`@NotNull`) and is triggered by `@Valid`
   on the resource method.
