@@ -97,13 +97,16 @@ public class DownloadService {
         return job;
     }
 
-    // Marks a job for cancellation and returns whether it was marked.
+    // Marks a job for cancellation and returns whether it was marked. Logs
+    // the decision with the caller's reason, so every cancellation is logged
+    // in one place and one format.
     // Cancelling a job that has already stopped is a no-op: for a completed
     // job it would deny access to a package that is still on disk, and for
     // a failed one it would hide the failure behind a cancellation.
-    public boolean cancel(DownloadJob job) {
+    public boolean cancel(DownloadJob job, String reason) {
         if (job.cancelled || !job.processing() || job.failed()) return false;
         job.cancelled = true;
+        LOG.infof("%s Cancelled: %s", job, reason);
         return true;
     }
 
@@ -116,10 +119,9 @@ public class DownloadService {
 
     void cancelAbandonedJobs(long now) {
         long timeout = keepAliveTimeout.toNanos();
+        String reason = String.format("client not seen for %d s", keepAliveTimeout.toSeconds());
         for (DownloadJob job : jobs.values()) {
-            if (now - job.lastSeen > timeout && cancel(job)) {
-                LOG.infof("%s Cancelled, client not seen for over %s", job, keepAliveTimeout);
-            }
+            if (now - job.lastSeen > timeout) cancel(job, reason);
         }
         // A job cancelled before it started has no output and nothing to
         // report, so there is no reason to keep it

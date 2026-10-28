@@ -23,6 +23,8 @@ import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import fi.csc.avaa.paituli.LogCapture;
+import fi.csc.avaa.paituli.LogCapture.Line;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.download.io.FileOperations;
@@ -347,6 +349,25 @@ public class DownloadGeneratorTest {
         // Ensure we don't have errors and we used the logging service
         assert(job.error).isEmpty();
         Mockito.verify(logService).log(request);
+    }
+
+    @Test
+    public void cancelledJobShouldLogThatItStopped() {
+        final DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        Mockito.doNothing()
+                .when(generator).generate(any(DownloadJob.class));
+
+        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        job.cancelled = true;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            generator.processJob(job);
+
+            // Why it was cancelled is logged by DownloadService.cancel
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .contains(job + " Stopped after cancellation");
+        }
     }
 
     @Test
