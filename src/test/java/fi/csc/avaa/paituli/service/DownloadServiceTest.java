@@ -1,6 +1,7 @@
 package fi.csc.avaa.paituli.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -21,6 +22,8 @@ import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import fi.csc.avaa.paituli.LogCapture;
+import fi.csc.avaa.paituli.LogCapture.Line;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.model.DownloadJob;
@@ -111,7 +114,7 @@ public class DownloadServiceTest {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
         job.progress = 0.4;
 
-        assertThat(service.cancel(job)).isTrue();
+        assertThat(service.cancel(job, "test")).isTrue();
         assertThat(job.cancelled).isTrue();
     }
 
@@ -122,7 +125,7 @@ public class DownloadServiceTest {
 
         // A cancel arriving after completion must not deny access to a package
         // that is complete and still on disk.
-        assertThat(service.cancel(job)).isFalse();
+        assertThat(service.cancel(job, "test")).isFalse();
         assertThat(job.cancelled).isFalse();
     }
 
@@ -133,7 +136,7 @@ public class DownloadServiceTest {
 
         // A cancelled job never reaches progress 1.0, so it still looks
         // "processing", but there is nothing left to cancel
-        assertThat(service.cancel(job)).isFalse();
+        assertThat(service.cancel(job, "test")).isFalse();
     }
 
     @Test
@@ -145,8 +148,33 @@ public class DownloadServiceTest {
 
         // The failure is the more useful thing to report, and cancelling
         // something that already stopped should not change what is reported.
-        assertThat(service.cancel(job)).isFalse();
+        assertThat(service.cancel(job, "test")).isFalse();
         assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void cancellationShouldBeLoggedWithItsReason() {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.cancel(job, "requested by client");
+
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .containsExactly(tuple("INFO", job + " Cancelled: requested by client"));
+        }
+    }
+
+    @Test
+    public void refusedCancellationShouldNotBeLogged() {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
+        job.progress = 1.0;
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.cancel(job, "requested by client");
+
+            assertThat(log.lines()).isEmpty();
+        }
     }
 
     // Shorthand for a job held by the service, so the keep-alive sweep sees it
@@ -176,6 +204,19 @@ public class DownloadServiceTest {
         service.cancelAbandonedJobs(job.lastSeen + seconds(16));
 
         assertThat(job.cancelled).isTrue();
+    }
+
+    @Test
+    public void abandonedJobShouldBeLoggedWithTheTimeout() {
+        DownloadJob job = storedJob();
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .containsExactly(job + " Cancelled: client not seen for 15 s");
+        }
     }
 
     @Test
@@ -238,7 +279,7 @@ public class DownloadServiceTest {
     public void jobCancelledBeforeFirstPollShouldNeverStart() {
         DownloadJob job = storedJob();
 
-        service.cancel(job);
+        service.cancel(job, "test");
         service.pollJob(job.ID);
 
         Mockito.verify(managedExecutor, never()).runAsync(any(Runnable.class));
@@ -274,7 +315,7 @@ public class DownloadServiceTest {
         Mockito.verify(managedExecutor).runAsync(queued.capture());
 
         // Cancelled before its turn comes
-        service.cancel(job);
+        service.cancel(job, "test");
         queued.getValue().run();
 
         Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
