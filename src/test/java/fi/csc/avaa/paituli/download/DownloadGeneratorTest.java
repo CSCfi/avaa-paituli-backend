@@ -371,25 +371,41 @@ public class DownloadGeneratorTest {
     }
 
     @Test
-    public void jobShouldErrorAndNotLogIfGeneratingThrows() throws InterruptedException {
+    public void failedJobShouldNotBeLoggedToStatistics() {
 
         // Make generation throw
         Mockito.doThrow(new FileOperationException(new IOException("oops")))
                 .when(generator).generate(any());
 
-        // Make mock request and run its job
         final DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.ZIP;
 
-        // The generator propagates exceptions
-        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        // The failure propagates to DownloadService, which records it on the job
         Assertions.assertThrows(FileOperationException.class, () -> {
-                generator.processJob(job);
+                processDummyJob(request);
         });
-
-        // Ensure the throw is handled as expected
-        assert(job.error).contains("oops");
         Mockito.verifyNoInteractions(logService);
+    }
+
+    @Test
+    public void failedStatisticsWriteShouldNotFailTheJob() {
+        final DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        Mockito.doNothing()
+                .when(generator).generate(any(DownloadJob.class));
+        RuntimeException failure = new RuntimeException("database down");
+        Mockito.doThrow(failure).when(logService).log(request);
+
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            DownloadJob job = processDummyJob(request);
+
+            // The package is complete, so it stays available
+            assertThat(job.processing()).isFalse();
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(failure);
+        }
     }
 
 }

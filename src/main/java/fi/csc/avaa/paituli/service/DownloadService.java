@@ -84,9 +84,25 @@ public class DownloadService {
 
         // While maxConcurrentJobs are running, the job waits in the executor's
         // queue with progress at 0. A job cancelled while waiting never runs.
-        managedExecutor.runAsync(() -> {
-            if (!job.cancelled) downloadGenerator.processJob(job);
-        });
+        managedExecutor.runAsync(() -> run(job));
+    }
+
+    // Runs a job on a worker thread, and records and logs its failure. This
+    // catches everything, Errors included: anything thrown out of here would
+    // vanish unlogged with the future runAsync returns.
+    private void run(DownloadJob job) {
+        if (job.cancelled) return;
+        try {
+            downloadGenerator.processJob(job);
+        } catch (Throwable err) {
+            // getMessage() is null for exceptions constructed without one
+            String reason = err.getMessage() != null ? err.getMessage() : err.toString();
+            LOG.errorf(err, "%s Failed: %s", job, reason);
+            // A job left looking like it is still processing would keep its
+            // client waiting indefinitely, as the client's polls keep it alive.
+            // A job that already completed keeps its output.
+            if (job.processing()) job.error = reason;
+        }
     }
 
     // Looks up a job for a client. Any request about a job is a sign of life

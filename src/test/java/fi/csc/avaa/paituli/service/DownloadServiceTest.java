@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,7 @@ import fi.csc.avaa.paituli.LogCapture;
 import fi.csc.avaa.paituli.LogCapture.Line;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.DownloadGenerator;
+import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 
@@ -337,6 +339,69 @@ public class DownloadServiceTest {
         queued.getValue().run();
 
         Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
+    }
+
+    // Starts a job and runs the task it hands to the executor, as a worker would
+    private void runOnWorker(DownloadJob job) {
+        service.pollJob(job.ID);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        Mockito.verify(managedExecutor).runAsync(task.capture());
+        task.getValue().run();
+    }
+
+    @Test
+    public void errorEscapingTheGeneratorShouldFailTheJob() {
+        DownloadJob job = storedJob();
+        StackOverflowError error = new StackOverflowError();
+        Mockito.doThrow(error).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            // Left looking like it is still processing, the job would keep
+            // its client polling, and so alive, indefinitely
+            assertThat(job.failed()).isTrue();
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::thrown)
+                    .containsExactly(tuple("ERROR", error));
+        }
+    }
+
+    @Test
+    public void generationFailureShouldBeRecordedOnTheJob() {
+        DownloadJob job = storedJob();
+        FileOperationException failure = new FileOperationException(new IOException("disk full"));
+        Mockito.doThrow(failure).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            assertThat(job.error).contains("disk full");
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::message, Line::thrown)
+                    .containsExactly(tuple(job + " Failed: " + job.error, failure));
+        }
+    }
+
+    @Test
+    public void failureAfterTheJobCompletedShouldOnlyBeLogged() {
+        DownloadJob job = storedJob();
+        RuntimeException failure = new RuntimeException("statistics write failed");
+        Mockito.doAnswer(invocation -> {
+            job.progress = 1.0;
+            throw failure;
+        }).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            // The package is complete, so it stays available
+            assertThat(job.failed()).isFalse();
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::thrown)
+                    .containsExactly(tuple("ERROR", failure));
+        }
     }
 
     @Test

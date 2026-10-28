@@ -27,10 +27,9 @@ Single test class / method:
 Targeting a single integration test needs `-DfailIfNoSpecifiedTests=false`, otherwise the default
 execution fails on finding no matching unit test.
 
-A green `./mvnw test` prints **five** stack traces — four from negative-path tests in
-`DownloadGeneratorTest` hitting `LOG.error` in `DownloadGenerator.processJob`, one from
-`BuildInfoServiceTest` feeding invalid JSON to `BuildInfoService`. Expected; a sixth means something
-broke.
+A green `./mvnw test` prints **one** stack trace, from `BuildInfoServiceTest` feeding invalid JSON
+to `BuildInfoService`. Expected; a second means something broke. Tests that expect a logged error
+collect it with `LogCapture`, which keeps it off the console.
 
 ## Local setup
 
