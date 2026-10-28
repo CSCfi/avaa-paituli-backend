@@ -339,6 +339,52 @@ public class DownloadServiceTest {
         Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
     }
 
+    // Starts a job and runs the task it hands to the executor, as a worker would
+    private void runOnWorker(DownloadJob job) {
+        service.pollJob(job.ID);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        Mockito.verify(managedExecutor).runAsync(task.capture());
+        task.getValue().run();
+    }
+
+    @Test
+    public void errorEscapingTheGeneratorShouldFailTheJob() {
+        DownloadJob job = storedJob();
+        StackOverflowError error = new StackOverflowError();
+        Mockito.doThrow(error).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            // Left looking like it is still processing, the job would keep
+            // its client polling, and so alive, indefinitely
+            assertThat(job.failed()).isTrue();
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::thrown)
+                    .containsExactly(tuple("ERROR", error));
+        }
+    }
+
+    @Test
+    public void failureAfterTheJobCompletedShouldOnlyBeLogged() {
+        DownloadJob job = storedJob();
+        RuntimeException failure = new RuntimeException("statistics write failed");
+        Mockito.doAnswer(invocation -> {
+            job.progress = 1.0;
+            throw failure;
+        }).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            // The package is complete, so it stays available
+            assertThat(job.failed()).isFalse();
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::thrown)
+                    .containsExactly(tuple("ERROR", failure));
+        }
+    }
+
     @Test
     public void jobsBeyondTheCapShouldWaitAtZeroProgress() throws InterruptedException {
         // A real executor instead of the mock, capped at two jobs

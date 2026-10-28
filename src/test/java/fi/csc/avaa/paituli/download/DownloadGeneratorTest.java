@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -274,7 +273,7 @@ public class DownloadGeneratorTest {
     }
 
     @Test
-    public void shouldThrowExceptionWhenNoFilesAreFound() {
+    public void jobShouldFailWhenNoFilesAreFound() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
         DownloadRequest request = new DownloadRequest();
@@ -284,13 +283,13 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> {
-                processDummyJob(request);
-        });
+        DownloadJob job = processDummyJob(request);
+
+        assertThat(job.error).isEqualTo("There were no existing files listed in the request");
     }
 
     @Test
-    public void exceptionsInFindFilenamesShouldBePropagated() {
+    public void exceptionsInFindFilenamesShouldFailTheJob() {
         final String wildcardFilePath = "file*.zip";
         final List<String> filePaths = Collections.singletonList(wildcardFilePath);
         final String wildcardFilePathAsRegex = "file.*\\.zip";
@@ -303,13 +302,13 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenThrow(new FileOperationException(new IOException()));
 
-        Assertions.assertThrows(FileOperationException.class, () -> {
-                processDummyJob(request);
-        });
+        DownloadJob job = processDummyJob(request);
+
+        assertThat(job.error).contains("IOException");
     }
 
     @Test
-    public void exceptionsInWritingOutputShouldBePropagated() {
+    public void exceptionsInWritingOutputShouldFailTheJob() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
         DownloadRequest request = new DownloadRequest();
@@ -321,9 +320,9 @@ public class DownloadGeneratorTest {
         Mockito.doThrow(new FileOperationException(new IOException()))
                 .when(fileOperations).zipper(any(), anyList());
 
-        Assertions.assertThrows(FileOperationException.class, () -> {
-                processDummyJob(request);
-        });
+        DownloadJob job = processDummyJob(request);
+
+        assertThat(job.error).contains("IOException");
     }
 
     private String absolutePathFor(String filePath) {
@@ -381,11 +380,8 @@ public class DownloadGeneratorTest {
         final DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.ZIP;
 
-        // The generator propagates exceptions
-        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
-        Assertions.assertThrows(FileOperationException.class, () -> {
-                generator.processJob(job);
-        });
+        // The failure is recorded on the job, not thrown
+        DownloadJob job = processDummyJob(request);
 
         // Ensure the throw is handled as expected
         assert(job.error).contains("oops");

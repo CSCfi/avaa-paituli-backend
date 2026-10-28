@@ -57,7 +57,7 @@ public class DownloadGenerator {
             LOG.error("Could not generate download", err);
             // getMessage() is null for exceptions constructed without one
             job.error = err.getMessage() != null ? err.getMessage() : err.toString();
-            throw err;
+            return;
         }
         if (job.cancelled) {
             // DownloadService.cancel has logged why
