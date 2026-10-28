@@ -87,12 +87,12 @@ public class DownloadResourceTest {
         DownloadJob job = dummyJob();
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        Mockito.when(downloadService.cancel(job)).thenReturn(true);
+        Mockito.when(downloadService.cancel(job, "requested by client")).thenReturn(true);
 
         Response response = downloadResource.cancelDownload(job.ID);
 
         // Whether a job may be cancelled is the service's decision
-        Mockito.verify(downloadService).cancel(job);
+        Mockito.verify(downloadService).cancel(job, "requested by client");
         assertThat(response.getStatus()).isEqualTo(200);
         @SuppressWarnings("unchecked")
         Map<String, Object> entity = (Map<String, Object>) response.getEntity();
@@ -104,7 +104,7 @@ public class DownloadResourceTest {
         DownloadJob job = dummyJob();
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        Mockito.when(downloadService.cancel(job)).thenReturn(false);
+        Mockito.when(downloadService.cancel(job, "requested by client")).thenReturn(false);
 
         Response response = downloadResource.cancelDownload(job.ID);
 

@@ -60,7 +60,8 @@ public class DownloadGenerator {
             throw err;
         }
         if (job.cancelled) {
-            LOG.infof("%s Canceled", job);
+            // DownloadService.cancel has logged why
+            LOG.infof("%s Stopped after cancellation", job);
         }
         else {
             job.progress = 1.0; // Signals job completion
