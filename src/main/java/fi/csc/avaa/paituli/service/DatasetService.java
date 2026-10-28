@@ -13,6 +13,9 @@ import java.util.stream.Stream;
 @ApplicationScoped
 public class DatasetService {
 
+    // Failures, such as the database being unreachable, are left to propagate:
+    // the client gets a 500 instead of an empty catalogue, and Quarkus logs
+    // the error with an id it also returns to the client
     @Transactional
     public List<LocalizedDataset> getLocalizedDatasets(Locale locale) {
         try (Stream<Dataset> stream = Dataset.stream("access", 1)) {
@@ -20,15 +23,5 @@ public class DatasetService {
                     .map(dataset -> LocalizedDataset.from(dataset, locale))
                     .collect(Collectors.toList());
         }
-        catch (Exception e)         
-        {
-             // printStackTrace method
-             // prints line numbers + call stack
-             e.printStackTrace();
-
-             // Prints what exception has been thrown
-             System.out.println(e);
-             return null;
-         }
     }
 }
