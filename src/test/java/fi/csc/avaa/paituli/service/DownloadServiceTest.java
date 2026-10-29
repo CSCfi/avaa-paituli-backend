@@ -234,6 +234,7 @@ public class DownloadServiceTest {
             service.cancelAbandonedJobs(job.lastSeen + seconds(16));
 
             assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("INFO"))
                     .extracting(Line::message)
                     .containsExactly(job + " Cancelled: client not seen for 15 s");
         }
@@ -309,9 +310,14 @@ public class DownloadServiceTest {
     public void abandonedJobThatNeverStartedShouldBeForgotten() {
         DownloadJob job = storedJob();
 
-        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.cancelAbandonedJobs(job.lastSeen + seconds(16));
 
-        assertThat(service.getJob(job.ID)).isNull();
+            assertThat(service.getJob(job.ID)).isNull();
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .contains(tuple("DEBUG", job + " Forgotten, as it was cancelled before it started"));
+        }
     }
 
     @Test
