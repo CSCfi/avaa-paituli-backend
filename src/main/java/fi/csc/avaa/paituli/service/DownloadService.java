@@ -10,6 +10,7 @@ import org.eclipse.microprofile.context.ManagedExecutor;
 import org.jboss.logging.Logger;
 
 import fi.csc.avaa.paituli.download.DownloadGenerator;
+import fi.csc.avaa.paituli.download.DownloadRequestException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import io.quarkus.scheduler.Scheduled;
@@ -103,7 +104,11 @@ public class DownloadService {
         } catch (Throwable err) {
             // getMessage() is null for exceptions constructed without one
             String reason = err.getMessage() != null ? err.getMessage() : err.toString();
-            LOG.errorf(err, "%s Failed: %s", job, reason);
+            if (err instanceof DownloadRequestException) {
+                LOG.warnf("%s Failed: %s", job, reason);
+            } else {
+                LOG.errorf(err, "%s Failed: %s", job, reason);
+            }
             // A job left looking like it is still processing would keep its
             // client waiting indefinitely, as the client's polls keep it alive.
             // A job that already completed keeps its output.

@@ -294,7 +294,7 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> {
+        Assertions.assertThrows(DownloadRequestException.class, () -> {
                 processDummyJob(request);
         });
     }
