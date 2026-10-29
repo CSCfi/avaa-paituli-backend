@@ -81,6 +81,22 @@ public class DownloadServiceTest {
     }
 
     @Test
+    public void receivedJobShouldBeLoggedWithItsIdAndOutput() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.data_id = "some_dataset";
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            DownloadJob job = service.createDownloadJob(request);
+
+            assertThat(log.lines()).hasSize(1);
+            Line line = log.lines().get(0);
+            assertThat(line.level()).isEqualTo("INFO");
+            assertThat(line.message()).contains("ZIP", "some_dataset", job.ID, job.outputFilePath);
+        }
+    }
+
+    @Test
     public void jobShouldBeStoredAfterCreation() {
 
         // Create job with a dummy request
@@ -217,6 +233,7 @@ public class DownloadServiceTest {
             service.cancelAbandonedJobs(job.lastSeen + seconds(16));
 
             assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("INFO"))
                     .extracting(Line::message)
                     .containsExactly(job + " Cancelled: client not seen for 15 s");
         }
@@ -292,9 +309,14 @@ public class DownloadServiceTest {
     public void abandonedJobThatNeverStartedShouldBeForgotten() {
         DownloadJob job = storedJob();
 
-        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.cancelAbandonedJobs(job.lastSeen + seconds(16));
 
-        assertThat(service.getJob(job.ID)).isNull();
+            assertThat(service.getJob(job.ID)).isNull();
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .contains(tuple("DEBUG", job + " Forgotten, as it was cancelled before it started"));
+        }
     }
 
     @Test
@@ -345,8 +367,66 @@ public class DownloadServiceTest {
             // its client polling, and so alive, indefinitely
             assertThat(job.failed()).isTrue();
             assertThat(log.lines())
-                    .extracting(Line::level, Line::thrown)
-                    .containsExactly(tuple("ERROR", error));
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(error);
+        }
+    }
+
+    @Test
+    public void completedJobShouldLogItsTimeIncludingTheQueue() {
+        DownloadJob job = storedJob();
+        Mockito.doNothing().when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("INFO"))
+                    .extracting(Line::message)
+                    .hasSize(2)
+                    .anyMatch(message -> message.matches(".* Started after \\d+\\.\\d s in queue"))
+                    .anyMatch(message -> message.matches(".* Completed in \\d+\\.\\d s, \\d+\\.\\d s of it in queue"));
+        }
+    }
+
+    @Test
+    public void timeBeforeTheFirstPollShouldNotCountAsQueueTime() throws InterruptedException {
+        DownloadJob job = storedJob();
+        Mockito.doNothing().when(downloadGenerator).processJob(job);
+        // The job enters the queue only at its first poll
+        Thread.sleep(200);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("INFO"))
+                    .extracting(Line::message)
+                    .anyMatch(message -> message.matches(".* Started after 0\\.[01] s in queue"))
+                    .anyMatch(message -> message.matches(".* Completed in (0\\.[2-9]|[1-9]\\d*\\.\\d) s, 0\\.[01] s of it in queue"));
+        }
+    }
+
+    @Test
+    public void cancelledJobShouldLogThatItStoppedInsteadOfCompleting() {
+        DownloadJob job = storedJob();
+        // Cancelled while processing
+        Mockito.doAnswer(invocation -> {
+            job.cancelled = true;
+            return null;
+        }).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            // Why it was cancelled is logged by cancel()
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .contains(tuple("DEBUG", job + " Stopped after cancellation"));
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .noneMatch(message -> message.contains("Completed"));
         }
     }
 
@@ -382,8 +462,9 @@ public class DownloadServiceTest {
             // The package is complete, so it stays available
             assertThat(job.failed()).isFalse();
             assertThat(log.lines())
-                    .extracting(Line::level, Line::thrown)
-                    .containsExactly(tuple("ERROR", failure));
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(failure);
         }
     }
 

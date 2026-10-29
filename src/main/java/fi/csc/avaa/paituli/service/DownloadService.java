@@ -1,6 +1,7 @@
 package fi.csc.avaa.paituli.service;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -77,6 +78,9 @@ public class DownloadService {
     public DownloadJob createDownloadJob(DownloadRequest request) {
         DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
         jobs.put(job.ID, job);
+        // The full ID is what the client holds; later lines carry only its prefix
+        LOG.infof("%s Received %s request for %s, ID %s, output %s",
+            job, request.downloadType, request.data_id, job.ID, job.outputFilePath);
         return job;
     }
 
@@ -94,14 +98,17 @@ public class DownloadService {
 
         // While maxConcurrentJobs are running, the job waits in the executor's
         // queue with progress at 0. A job cancelled while waiting never runs.
-        managedExecutor.runAsync(() -> run(job));
+        long queuedAt = System.nanoTime();
+        managedExecutor.runAsync(() -> run(job, queuedAt));
     }
 
     // Runs a job on a worker thread, and records and logs its failure. This
     // catches everything, Errors included: anything thrown out of here would
     // vanish unlogged with the future runAsync returns.
-    private void run(DownloadJob job) {
+    private void run(DownloadJob job, long queuedAt) {
         if (job.cancelled) return;
+        long started = System.nanoTime();
+        LOG.infof("%s Started after %s in queue", job, seconds(started - queuedAt));
         try {
             downloadGenerator.processJob(job);
         } catch (Throwable err) {
@@ -112,7 +119,22 @@ public class DownloadService {
             // client waiting indefinitely, as the client's polls keep it alive.
             // A job that already completed keeps its output.
             if (job.processing()) job.error = reason;
+            return;
         }
+        if (job.cancelled) {
+            // cancel() has logged why
+            LOG.debugf("%s Stopped after cancellation", job);
+        } else {
+            // The total counts from when the job was received, so it also
+            // includes the wait for the client's first poll
+            LOG.infof("%s Completed in %s, %s of it in queue", job,
+                seconds(System.nanoTime() - job.receivedAt), seconds(started - queuedAt));
+        }
+    }
+
+    // Formats a System.nanoTime() difference, e.g. "42.3 s"
+    private static String seconds(long nanos) {
+        return String.format(Locale.ROOT, "%.1f s", nanos / 1e9);
     }
 
     // Looks up a job for a client. Any request about a job is a sign of life
@@ -151,6 +173,10 @@ public class DownloadService {
         }
         // A job cancelled before it started has no output and nothing to
         // report, so there is no reason to keep it
-        jobs.values().removeIf(job -> job.cancelled && !job.started.get());
+        jobs.values().removeIf(job -> {
+            if (!job.cancelled || job.started.get()) return false;
+            LOG.debugf("%s Forgotten, as it was cancelled before it started", job);
+            return true;
+        });
     }
 }
