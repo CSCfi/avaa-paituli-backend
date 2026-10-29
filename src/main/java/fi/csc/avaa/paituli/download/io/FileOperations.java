@@ -68,7 +68,7 @@ public class FileOperations {
             {
                 try {
                     Path zipPath = Files.createFile(Paths.get(job.outputFilePath));
-                    LOG.info("Zipping " + zipPath); 
+                    LOG.debugf("%s Zipping to %s", job, zipPath);
                     zout = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipPath)));
                 } catch (IOException e) {
                     throw new FileOperationException(e);
