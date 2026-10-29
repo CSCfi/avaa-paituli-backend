@@ -11,6 +11,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -283,7 +284,7 @@ public class DownloadGeneratorTest {
     }
 
     @Test
-    public void jobShouldFailWhenNoFilesAreFound() {
+    public void shouldThrowExceptionWhenNoFilesAreFound() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
         DownloadRequest request = new DownloadRequest();
@@ -293,13 +294,13 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
 
-        DownloadJob job = processDummyJob(request);
-
-        assertThat(job.error).isEqualTo("There were no existing files listed in the request");
+        Assertions.assertThrows(IllegalArgumentException.class, () -> {
+                processDummyJob(request);
+        });
     }
 
     @Test
-    public void exceptionsInFindFilenamesShouldFailTheJob() {
+    public void exceptionsInFindFilenamesShouldBePropagated() {
         final String wildcardFilePath = "file*.zip";
         final List<String> filePaths = Collections.singletonList(wildcardFilePath);
         final String wildcardFilePathAsRegex = "file.*\\.zip";
@@ -312,13 +313,13 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenThrow(new FileOperationException(new IOException()));
 
-        DownloadJob job = processDummyJob(request);
-
-        assertThat(job.error).contains("IOException");
+        Assertions.assertThrows(FileOperationException.class, () -> {
+                processDummyJob(request);
+        });
     }
 
     @Test
-    public void exceptionsInWritingOutputShouldFailTheJob() {
+    public void exceptionsInWritingOutputShouldBePropagated() {
         final String filePath = "file.zip";
         final List<String> filePaths = Collections.singletonList(filePath);
         DownloadRequest request = new DownloadRequest();
@@ -330,9 +331,9 @@ public class DownloadGeneratorTest {
         Mockito.doThrow(new FileOperationException(new IOException()))
                 .when(fileOperations).zipper(any(), anyList());
 
-        DownloadJob job = processDummyJob(request);
-
-        assertThat(job.error).contains("IOException");
+        Assertions.assertThrows(FileOperationException.class, () -> {
+                processDummyJob(request);
+        });
     }
 
     private String absolutePathFor(String filePath) {
@@ -380,22 +381,41 @@ public class DownloadGeneratorTest {
     }
 
     @Test
-    public void jobShouldErrorAndNotLogIfGeneratingThrows() throws InterruptedException {
+    public void failedJobShouldNotBeLoggedToStatistics() {
 
         // Make generation throw
         Mockito.doThrow(new FileOperationException(new IOException("oops")))
                 .when(generator).generate(any());
 
-        // Make mock request and run its job
         final DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.ZIP;
 
-        // The failure is recorded on the job, not thrown
-        DownloadJob job = processDummyJob(request);
-
-        // Ensure the throw is handled as expected
-        assert(job.error).contains("oops");
+        // The failure propagates to DownloadService, which records it on the job
+        Assertions.assertThrows(FileOperationException.class, () -> {
+                processDummyJob(request);
+        });
         Mockito.verifyNoInteractions(logService);
+    }
+
+    @Test
+    public void failedStatisticsWriteShouldNotFailTheJob() {
+        final DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        Mockito.doNothing()
+                .when(generator).generate(any(DownloadJob.class));
+        RuntimeException failure = new RuntimeException("database down");
+        Mockito.doThrow(failure).when(logService).log(request);
+
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            DownloadJob job = processDummyJob(request);
+
+            // The package is complete, so it stays available
+            assertThat(job.processing()).isFalse();
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(failure);
+        }
     }
 
 }

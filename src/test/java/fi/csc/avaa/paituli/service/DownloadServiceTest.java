@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +27,7 @@ import fi.csc.avaa.paituli.LogCapture;
 import fi.csc.avaa.paituli.LogCapture.Line;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.DownloadGenerator;
+import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 
@@ -378,6 +380,23 @@ public class DownloadServiceTest {
             assertThat(log.lines())
                     .extracting(Line::level, Line::thrown)
                     .containsExactly(tuple("ERROR", error));
+        }
+    }
+
+    @Test
+    public void generationFailureShouldBeRecordedOnTheJob() {
+        DownloadJob job = storedJob();
+        FileOperationException failure = new FileOperationException(new IOException("disk full"));
+        Mockito.doThrow(failure).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            assertThat(job.error).contains("disk full");
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::message, Line::thrown)
+                    .containsExactly(tuple(job + " Failed: " + job.error, failure));
         }
     }
 

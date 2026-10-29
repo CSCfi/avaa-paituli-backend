@@ -90,18 +90,21 @@ public class DownloadService {
         managedExecutor.runAsync(() -> run(job));
     }
 
-    // Runs a job on a worker thread. processJob records and logs its own
-    // failures; this catches whatever escapes it, such as an Error, which
-    // would otherwise vanish unlogged with the future runAsync returns.
+    // Runs a job on a worker thread, and records and logs its failure. This
+    // catches everything, Errors included: anything thrown out of here would
+    // vanish unlogged with the future runAsync returns.
     private void run(DownloadJob job) {
         if (job.cancelled) return;
         try {
             downloadGenerator.processJob(job);
         } catch (Throwable err) {
-            LOG.errorf(err, "%s Failed unexpectedly", job);
+            // getMessage() is null for exceptions constructed without one
+            String reason = err.getMessage() != null ? err.getMessage() : err.toString();
+            LOG.errorf(err, "%s Failed: %s", job, reason);
             // A job left looking like it is still processing would keep its
-            // client waiting indefinitely, as the client's polls keep it alive
-            if (job.processing() && !job.failed()) job.error = "Processing failed unexpectedly";
+            // client waiting indefinitely, as the client's polls keep it alive.
+            // A job that already completed keeps its output.
+            if (job.processing()) job.error = reason;
         }
     }
 

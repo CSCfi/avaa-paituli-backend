@@ -48,17 +48,11 @@ public class DownloadGenerator {
         }
     }
 
+    // Generates the job's output. A failure is thrown to the caller, which
+    // records it on the job.
     public void processJob(DownloadJob job) {
         LOG.infof("%s Starting job processing", job);
-        try {
-            generate(job);
-        }
-        catch (Exception err) {
-            LOG.error("Could not generate download", err);
-            // getMessage() is null for exceptions constructed without one
-            job.error = err.getMessage() != null ? err.getMessage() : err.toString();
-            return;
-        }
+        generate(job);
         if (job.cancelled) {
             // DownloadService.cancel has logged why
             LOG.infof("%s Stopped after cancellation", job);
@@ -67,7 +61,12 @@ public class DownloadGenerator {
             job.progress = 1.0; // Signals job completion
             LOG.infof("%s Completed with output %s", job, job.outputFilePath);
         }
-        logService.log(job.request);
+        // The download itself is done, so a failure here is only logged
+        try {
+            logService.log(job.request);
+        } catch (Exception err) {
+            LOG.errorf(err, "%s Could not record download statistics", job);
+        }
     }
 
     private void generateZip(DownloadJob job) {
