@@ -27,9 +27,8 @@ Single test class / method:
 Targeting a single integration test needs `-DfailIfNoSpecifiedTests=false`, otherwise the default
 execution fails on finding no matching unit test.
 
-A green `./mvnw test` prints **one** stack trace, from `BuildInfoServiceTest` feeding invalid JSON
-to `BuildInfoService`. Expected; a second means something broke. Tests that expect a logged error
-collect it with `LogCapture`, which keeps it off the console.
+A green `./mvnw test` prints **no** stack traces: tests that expect a logged error collect it with
+`LogCapture`, which keeps it off the console. A stack trace in the output means something broke.
 
 ## Local setup
 
