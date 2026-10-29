@@ -228,7 +228,17 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
                 .thenReturn(false);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            List<Line> errors = log.lines().stream()
+                    .filter(line -> line.level().equals("ERROR"))
+                    .toList();
+            assertThat(errors).hasSize(1);
+            assertThat(errors.get(0).message())
+                    .contains(job.ID.substring(0, 8), absolutePathFor(filePath2));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
@@ -271,7 +281,15 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .anyMatch(message -> message.contains(
+                            "Resolved 2 requested paths to 3 existing paths, 0.0 GiB of the 15 GiB limit"));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
@@ -307,9 +325,14 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
 
-        Assertions.assertThrows(DownloadRequestException.class, () -> {
-                processDummyJob(request);
-        });
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            Assertions.assertThrows(DownloadRequestException.class, () -> {
+                    processDummyJob(request);
+            });
+
+            // The missing file is logged before the job fails on having none
+            assertThat(log.lines()).extracting(Line::level).containsExactly("ERROR");
+        }
     }
 
     @Test
