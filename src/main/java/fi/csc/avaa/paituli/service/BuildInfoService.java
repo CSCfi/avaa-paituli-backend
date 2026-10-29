@@ -26,6 +26,10 @@ public class BuildInfoService {
     // lifetime. A failed read is not cached: the file may still appear later.
     private volatile BuildInfo buildInfo;
 
+    // A failed read is logged at WARN or ERROR the first time and at DEBUG
+    // after that, since it is retried on every request
+    private volatile boolean failureLogged;
+
     // Returns the build info, or null if the file is missing or unreadable.
     public BuildInfo getBuildInfo() {
         BuildInfo cached = buildInfo;
@@ -38,14 +42,24 @@ public class BuildInfoService {
 
     BuildInfo readBuildInfo(Path path) {
         if (!Files.isReadable(path)) {
-            LOG.warnf("Build info file %s is missing or not readable", path.toAbsolutePath());
+            LOG.logf(failureLevel(Logger.Level.WARN),
+                "Build info file %s is missing or not readable", path.toAbsolutePath());
             return null;
         }
         try (Reader reader = Files.newBufferedReader(path); Jsonb jsonb = JsonbBuilder.create()) {
             return jsonb.fromJson(reader, BuildInfo.class);
         } catch (Exception e) {
-            LOG.errorf(e, "Could not read build info from %s", path.toAbsolutePath());
+            LOG.logf(failureLevel(Logger.Level.ERROR), e,
+                "Could not read build info from %s", path.toAbsolutePath());
             return null;
         }
+    }
+
+    // The level for logging a failed read: the given one the first time,
+    // DEBUG after that
+    private Logger.Level failureLevel(Logger.Level first) {
+        if (failureLogged) return Logger.Level.DEBUG;
+        failureLogged = true;
+        return first;
     }
 }
