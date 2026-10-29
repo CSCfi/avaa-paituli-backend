@@ -54,10 +54,20 @@ public class DownloadService {
             .build();
     }
 
+    // Set on shutdown, so the jobs it interrupts aren't logged as failures
+    private volatile boolean shuttingDown;
+
     // Jobs don't survive a restart anyway, so queued ones are dropped and
     // running ones interrupted
     @PreDestroy
     void shutdown() {
+        shuttingDown = true;
+        long unfinished = jobs.values().stream()
+            .filter(job -> job.started.get() && job.processing() && !job.cancelled && !job.failed())
+            .count();
+        if (unfinished > 0) {
+            LOG.warnf("Unfinished jobs lost in shutdown: %d", unfinished);
+        }
         managedExecutor.shutdownNow();
     }
 
@@ -102,6 +112,11 @@ public class DownloadService {
         try {
             downloadGenerator.processJob(job);
         } catch (Throwable err) {
+            if (shuttingDown) {
+                // The interrupt makes the copy fail; shutdown() has logged the loss
+                LOG.infof("%s Interrupted by shutdown", job);
+                return;
+            }
             // getMessage() is null for exceptions constructed without one
             String reason = err.getMessage() != null ? err.getMessage() : err.toString();
             if (err instanceof DownloadRequestException) {
