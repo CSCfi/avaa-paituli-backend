@@ -67,6 +67,9 @@ public class DownloadService {
     public DownloadJob createDownloadJob(DownloadRequest request) {
         DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
         jobs.put(job.ID, job);
+        // The full ID is what the client holds; later lines carry only its prefix
+        LOG.infof("%s Received %s request for %s, ID %s, output %s",
+            job, request.downloadType, request.data_id, job.ID, job.outputFilePath);
         return job;
     }
 
