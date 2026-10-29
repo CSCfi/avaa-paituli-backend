@@ -32,6 +32,7 @@ import fi.csc.avaa.paituli.download.io.FileSizeOperations;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.service.LogService;
+import io.quarkus.runtime.StartupEvent;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadGeneratorTest {
@@ -64,6 +65,17 @@ public class DownloadGeneratorTest {
     public void init() {
         generator.inputPath = inputPath;
         generator.ftpBaseUrl = ftpBaseUrl;
+    }
+
+    @Test
+    public void startupShouldLogTheConfig() {
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            generator.onStart(new StartupEvent());
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .containsExactly("Reading files from /foo/, URL lists pointing to http://ftp.example.com");
+        }
     }
 
     // Shorthand method
