@@ -49,17 +49,12 @@ public class DownloadGenerator {
     }
 
     // Generates the job's output. A failure is thrown to the caller, which
-    // records it on the job.
+    // records it on the job. DownloadService logs when the job starts and how
+    // it ends; this class logs the details in between.
     public void processJob(DownloadJob job) {
-        LOG.infof("%s Starting job processing", job);
         generate(job);
-        if (job.cancelled) {
-            // DownloadService.cancel has logged why
-            LOG.infof("%s Stopped after cancellation", job);
-        }
-        else {
+        if (!job.cancelled) {
             job.progress = 1.0; // Signals job completion
-            LOG.infof("%s Completed with output %s", job, job.outputFilePath);
         }
         // The download itself is done, so a failure here is only logged
         try {

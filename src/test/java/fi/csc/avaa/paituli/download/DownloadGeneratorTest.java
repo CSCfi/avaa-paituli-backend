@@ -362,25 +362,6 @@ public class DownloadGeneratorTest {
     }
 
     @Test
-    public void cancelledJobShouldLogThatItStopped() {
-        final DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        Mockito.doNothing()
-                .when(generator).generate(any(DownloadJob.class));
-
-        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
-        job.cancelled = true;
-        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
-            generator.processJob(job);
-
-            // Why it was cancelled is logged by DownloadService.cancel
-            assertThat(log.lines())
-                    .extracting(Line::message)
-                    .contains(job + " Stopped after cancellation");
-        }
-    }
-
-    @Test
     public void failedJobShouldNotBeLoggedToStatistics() {
 
         // Make generation throw

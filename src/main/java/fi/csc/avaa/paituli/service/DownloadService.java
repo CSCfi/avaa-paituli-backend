@@ -1,6 +1,7 @@
 package fi.csc.avaa.paituli.service;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -95,6 +96,8 @@ public class DownloadService {
     // vanish unlogged with the future runAsync returns.
     private void run(DownloadJob job) {
         if (job.cancelled) return;
+        long started = System.nanoTime();
+        LOG.infof("%s Started after %s in queue", job, seconds(started - job.receivedAt));
         try {
             downloadGenerator.processJob(job);
         } catch (Throwable err) {
@@ -105,7 +108,20 @@ public class DownloadService {
             // client waiting indefinitely, as the client's polls keep it alive.
             // A job that already completed keeps its output.
             if (job.processing()) job.error = reason;
+            return;
         }
+        if (job.cancelled) {
+            // cancel() has logged why
+            LOG.debugf("%s Stopped after cancellation", job);
+        } else {
+            LOG.infof("%s Completed in %s, %s of it in queue", job,
+                seconds(System.nanoTime() - job.receivedAt), seconds(started - job.receivedAt));
+        }
+    }
+
+    // Formats a System.nanoTime() difference, e.g. "42.3 s"
+    private static String seconds(long nanos) {
+        return String.format(Locale.ROOT, "%.1f s", nanos / 1e9);
     }
 
     // Looks up a job for a client. Any request about a job is a sign of life
