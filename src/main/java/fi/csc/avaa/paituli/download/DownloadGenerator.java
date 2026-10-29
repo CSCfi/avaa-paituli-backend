@@ -77,10 +77,10 @@ public class DownloadGenerator {
         List<String> paths = collectAbsolutePaths(job);
         long filesSize = fileSizeOperations.count(paths);
         LOG.debugf("%s Resolved %d requested paths to %d existing paths, %s of the %d GiB limit",
-            job, job.request.filePaths.size(), paths.size(),
-            String.format(Locale.ROOT, "%.1f GiB", filesSize / (double) G), MAXSIZE / G);
+            job, job.request.filePaths.size(), paths.size(), gib(filesSize), MAXSIZE / G);
         if (filesSize > MAXSIZE ) {
-            throw new FileSizesException(filesSize+" "+job.request.data_id);
+            throw new FileSizesException(String.format("The requested files total %s, over the %d GiB limit",
+                gib(filesSize), MAXSIZE / G));
         }
         for (ZipProgress zip : fileOperations.zipper(job, paths))
         {
@@ -104,7 +104,7 @@ public class DownloadGenerator {
             if (absolutePath.contains("*")) {
                 List<String> found = findMatchingFiles(absolutePath);
                 if (found.isEmpty()) {
-                    throw new DownloadRequestException("Did not find any matches for " + absolutePath);
+                    throw new DownloadRequestException("No files match the requested path " + filePath);
                 }
                 absolutePaths.addAll(found);
             // Otherwise we simply add the file, if it exists.
@@ -136,6 +136,11 @@ public class DownloadGenerator {
         String regex = toRegex(absolutePath.substring(lastSeparatorIndex + 1));
         List<String> found = fileOperations.findFilenamesMatchingRegex(basePath, regex);
         return found;
+    }
+
+    // Formats a size in bytes, e.g. "2.1 GiB"
+    private static String gib(long bytes) {
+        return String.format(Locale.ROOT, "%.1f GiB", bytes / (double) G);
     }
 
     private static String toRegex(String filenameWithWildcard) {

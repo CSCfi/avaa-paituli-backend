@@ -25,6 +25,10 @@ import jakarta.inject.Inject;
 public class DownloadService {
 
     private static final Logger LOG = Logger.getLogger(DownloadService.class);
+
+    // What the client is told about a job that failed for any reason other
+    // than its request. The details are in the log, under the job's ID.
+    static final String SERVER_ERROR = "The download failed because of a server error";
     
     @Inject
     DownloadGenerator downloadGenerator;
@@ -128,15 +132,20 @@ public class DownloadService {
             }
             // getMessage() is null for exceptions constructed without one
             String reason = err.getMessage() != null ? err.getMessage() : err.toString();
+            // The client is told only what was wrong with its request. Any
+            // other message may describe the server, e.g. its file paths.
+            String clientError;
             if (err instanceof DownloadRequestException) {
                 LOG.warnf("%s Failed: %s", job, reason);
+                clientError = reason;
             } else {
                 LOG.errorf(err, "%s Failed: %s", job, reason);
+                clientError = SERVER_ERROR;
             }
             // A job left looking like it is still processing would keep its
             // client waiting indefinitely, as the client's polls keep it alive.
             // A job that already completed keeps its output.
-            if (job.processing()) job.error = reason;
+            if (job.processing()) job.error = clientError;
             return;
         }
         if (job.cancelled) {
