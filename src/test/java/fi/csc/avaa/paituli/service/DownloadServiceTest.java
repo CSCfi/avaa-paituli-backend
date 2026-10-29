@@ -465,6 +465,46 @@ public class DownloadServiceTest {
     }
 
     @Test
+    public void shutdownShouldWarnAboutUnfinishedJobs() {
+        DownloadJob running = storedJob();
+        service.pollJob(running.ID);
+        DownloadJob completed = storedJob();
+        service.pollJob(completed.ID);
+        completed.progress = 1.0;
+        // Never polled, so never started and nothing lost
+        storedJob();
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.shutdown();
+
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .containsExactly(tuple("WARN", "Unfinished jobs lost in shutdown: 1"));
+        }
+    }
+
+    @Test
+    public void jobInterruptedByShutdownShouldNotBeLoggedAsAFailure() {
+        DownloadJob job = storedJob();
+        service.pollJob(job.ID);
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        Mockito.verify(managedExecutor).runAsync(task.capture());
+        // Interrupting a copy makes it fail with an I/O error
+        Mockito.doThrow(new FileOperationException(new IOException("interrupted")))
+                .when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.shutdown();
+            task.getValue().run();
+
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .contains(tuple("INFO", job + " Interrupted by shutdown"))
+                    .noneMatch(line -> line.toList().contains("ERROR"));
+        }
+    }
+
+    @Test
     public void failureAfterTheJobCompletedShouldOnlyBeLogged() {
         DownloadJob job = storedJob();
         RuntimeException failure = new RuntimeException("statistics write failed");
