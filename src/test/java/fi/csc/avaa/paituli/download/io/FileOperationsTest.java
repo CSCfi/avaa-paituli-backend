@@ -82,6 +82,16 @@ public class FileOperationsTest {
     }
 
     @Test
+    public void listingWhatIsNotADirectoryShouldMatchNothing() throws IOException {
+        Path file = createFile("file.zip", "a".getBytes());
+
+        assertThat(fileOperations.findFilenamesMatchingRegex(inputDir.resolve("dir*").toString(), ".*"))
+                .isEmpty();
+        assertThat(fileOperations.findFilenamesMatchingRegex(file.toString(), ".*"))
+                .isEmpty();
+    }
+
+    @Test
     public void regularFileShouldBeZippedIntact() throws IOException {
         byte[] content = randomBytes(LARGE_FILE_SIZE);
         Path file = createFile("data/large.bin", content);
