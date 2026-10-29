@@ -2,6 +2,7 @@ package fi.csc.avaa.paituli.download;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -67,6 +68,9 @@ public class DownloadGenerator {
     private void generateZip(DownloadJob job) {
         List<String> paths = collectAbsolutePaths(job);
         long filesSize = fileSizeOperations.count(paths);
+        LOG.debugf("%s Resolved %d requested paths to %d existing paths, %s of the %d GiB limit",
+            job, job.request.filePaths.size(), paths.size(),
+            String.format(Locale.ROOT, "%.1f GiB", filesSize / (double) G), MAXSIZE / G);
         if (filesSize > MAXSIZE ) {
             throw new FileSizesException(filesSize+" "+job.request.data_id);
         }
@@ -82,6 +86,8 @@ public class DownloadGenerator {
 
     private void generateUrlList(DownloadJob job) {
         List<String> urls = collectFtpUrls(job);
+        LOG.debugf("%s Resolved %d requested paths to %d existing paths",
+            job, job.request.filePaths.size(), urls.size());
         fileOperations.writeUrlList(urls, job.outputFilePath);
     }
 
@@ -101,7 +107,7 @@ public class DownloadGenerator {
                 if (fileOperations.fileExists(absolutePath)) {
                     absolutePaths.add(absolutePath);
                 } else {
-                    LOG.error("Requested file cannot be found from path " + absolutePath);
+                    LOG.warnf("%s Requested file not found, left out of the download: %s", job, absolutePath);
                 }
             }
         });

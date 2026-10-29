@@ -228,7 +228,17 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
                 .thenReturn(false);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            List<Line> warnings = log.lines().stream()
+                    .filter(line -> line.level().equals("WARN"))
+                    .toList();
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0).message())
+                    .contains(job.ID.substring(0, 8), absolutePathFor(filePath2));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
@@ -271,7 +281,15 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .anyMatch(message -> message.contains(
+                            "Resolved 2 requested paths to 3 existing paths, 0.0 GiB of the 15 GiB limit"));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
