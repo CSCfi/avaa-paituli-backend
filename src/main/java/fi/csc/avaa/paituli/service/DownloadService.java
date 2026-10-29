@@ -13,10 +13,12 @@ import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.download.DownloadRequestException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
@@ -52,6 +54,13 @@ public class DownloadService {
             .maxAsync(maxConcurrentJobs)
             .maxQueued(-1)
             .build();
+    }
+
+    // Logs the effective config once at startup, so a deploy shows what the
+    // environment actually set
+    void onStart(@Observes StartupEvent event) {
+        LOG.infof("Writing downloads to %s, at most %d jobs at once, cancelling jobs unseen for %d s",
+            outputPath, maxConcurrentJobs, keepAliveTimeout.toSeconds());
     }
 
     // Set on shutdown, so the jobs it interrupts aren't logged as failures
