@@ -31,6 +31,7 @@ import fi.csc.avaa.paituli.download.DownloadRequestException;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import io.quarkus.runtime.StartupEvent;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadServiceTest {
@@ -461,6 +462,20 @@ public class DownloadServiceTest {
                     .filteredOn(line -> !line.level().equals("INFO"))
                     .extracting(Line::level, Line::message, Line::thrown)
                     .containsExactly(tuple("WARN", job + " Failed: " + job.error, null));
+        }
+    }
+
+    @Test
+    public void startupShouldLogTheConfig() {
+        service.maxConcurrentJobs = 12;
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.onStart(new StartupEvent());
+
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .containsExactly(tuple("INFO",
+                            "Writing downloads to /bar, at most 12 jobs at once, cancelling jobs unseen for 15 s"));
         }
     }
 

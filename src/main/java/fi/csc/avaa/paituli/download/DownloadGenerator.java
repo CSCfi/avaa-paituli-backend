@@ -14,7 +14,9 @@ import fi.csc.avaa.paituli.download.io.FileSizesException;
 import fi.csc.avaa.paituli.download.io.FileOperations.ZipProgress;
 import fi.csc.avaa.paituli.service.LogService;
 import fi.csc.avaa.paituli.model.DownloadJob;
+import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
@@ -38,6 +40,12 @@ public class DownloadGenerator {
 
     @ConfigProperty(name = "paituli.download.ftpBaseUrl")
     String ftpBaseUrl;
+
+    // Logs the effective config once at startup, so a deploy shows what the
+    // environment actually set
+    void onStart(@Observes StartupEvent event) {
+        LOG.infof("Reading files from %s, URL lists pointing to %s", inputPath, ftpBaseUrl);
+    }
 
     public void generate(DownloadJob job) {
         switch (job.request.downloadType) {
