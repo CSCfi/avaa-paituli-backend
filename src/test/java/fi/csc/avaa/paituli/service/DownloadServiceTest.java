@@ -378,8 +378,48 @@ public class DownloadServiceTest {
             // its client polling, and so alive, indefinitely
             assertThat(job.failed()).isTrue();
             assertThat(log.lines())
-                    .extracting(Line::level, Line::thrown)
-                    .containsExactly(tuple("ERROR", error));
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(error);
+        }
+    }
+
+    @Test
+    public void completedJobShouldLogItsTimeIncludingTheQueue() {
+        DownloadJob job = storedJob();
+        Mockito.doNothing().when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("INFO"))
+                    .extracting(Line::message)
+                    .hasSize(2)
+                    .anyMatch(message -> message.matches(".* Started after \\d+\\.\\d s in queue"))
+                    .anyMatch(message -> message.matches(".* Completed in \\d+\\.\\d s, \\d+\\.\\d s of it in queue"));
+        }
+    }
+
+    @Test
+    public void cancelledJobShouldLogThatItStoppedInsteadOfCompleting() {
+        DownloadJob job = storedJob();
+        // Cancelled while processing
+        Mockito.doAnswer(invocation -> {
+            job.cancelled = true;
+            return null;
+        }).when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            // Why it was cancelled is logged by cancel()
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .contains(tuple("DEBUG", job + " Stopped after cancellation"));
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .noneMatch(message -> message.contains("Completed"));
         }
     }
 
@@ -415,8 +455,9 @@ public class DownloadServiceTest {
             // The package is complete, so it stays available
             assertThat(job.failed()).isFalse();
             assertThat(log.lines())
-                    .extracting(Line::level, Line::thrown)
-                    .containsExactly(tuple("ERROR", failure));
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(failure);
         }
     }
 
