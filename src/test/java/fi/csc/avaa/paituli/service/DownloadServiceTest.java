@@ -27,6 +27,7 @@ import fi.csc.avaa.paituli.LogCapture;
 import fi.csc.avaa.paituli.LogCapture.Line;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.DownloadGenerator;
+import fi.csc.avaa.paituli.download.DownloadRequestException;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
@@ -437,6 +438,23 @@ public class DownloadServiceTest {
                     .filteredOn(line -> line.level().equals("ERROR"))
                     .extracting(Line::message, Line::thrown)
                     .containsExactly(tuple(job + " Failed: " + job.error, failure));
+        }
+    }
+
+    @Test
+    public void failureCausedByTheRequestShouldBeAWarningWithoutStackTrace() {
+        DownloadJob job = storedJob();
+        Mockito.doThrow(new DownloadRequestException("There were no existing files listed in the request"))
+                .when(downloadGenerator).processJob(job);
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            runOnWorker(job);
+
+            assertThat(job.error).isEqualTo("There were no existing files listed in the request");
+            assertThat(log.lines())
+                    .filteredOn(line -> !line.level().equals("INFO"))
+                    .extracting(Line::level, Line::message, Line::thrown)
+                    .containsExactly(tuple("WARN", job + " Failed: " + job.error, null));
         }
     }
 

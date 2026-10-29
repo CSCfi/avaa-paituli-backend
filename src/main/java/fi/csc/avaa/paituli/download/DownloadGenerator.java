@@ -90,7 +90,7 @@ public class DownloadGenerator {
             if (absolutePath.contains("*")) {
                 List<String> found = findMatchingFiles(absolutePath);
                 if (found.isEmpty()) {
-                    throw new IllegalArgumentException("Did not find any matches for " + absolutePath);
+                    throw new DownloadRequestException("Did not find any matches for " + absolutePath);
                 }
                 absolutePaths.addAll(found);
             // Otherwise we simply add the file, if it exists.
@@ -103,7 +103,7 @@ public class DownloadGenerator {
             }
         });
         if (absolutePaths.isEmpty()) {
-            throw new IllegalArgumentException("There were no existing files listed in the request");
+            throw new DownloadRequestException("There were no existing files listed in the request");
         }
         return absolutePaths;
     }
