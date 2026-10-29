@@ -81,6 +81,22 @@ public class DownloadServiceTest {
     }
 
     @Test
+    public void receivedJobShouldBeLoggedWithItsIdAndOutput() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.data_id = "some_dataset";
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            DownloadJob job = service.createDownloadJob(request);
+
+            assertThat(log.lines()).hasSize(1);
+            Line line = log.lines().get(0);
+            assertThat(line.level()).isEqualTo("INFO");
+            assertThat(line.message()).contains("ZIP", "some_dataset", job.ID, job.outputFilePath);
+        }
+    }
+
+    @Test
     public void jobShouldBeStoredAfterCreation() {
 
         // Create job with a dummy request
