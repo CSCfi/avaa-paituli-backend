@@ -104,7 +104,7 @@ public class DownloadGenerator {
                 if (fileOperations.fileExists(absolutePath)) {
                     absolutePaths.add(absolutePath);
                 } else {
-                    LOG.error("Requested file cannot be found from path " + absolutePath);
+                    LOG.warnf("%s Requested file not found, left out of the download: %s", job, absolutePath);
                 }
             }
         });

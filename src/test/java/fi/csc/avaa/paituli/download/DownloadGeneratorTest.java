@@ -204,7 +204,17 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
                 .thenReturn(false);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            List<Line> warnings = log.lines().stream()
+                    .filter(line -> line.level().equals("WARN"))
+                    .toList();
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0).message())
+                    .contains(job.ID.substring(0, 8), absolutePathFor(filePath2));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
