@@ -165,6 +165,10 @@ public class DownloadService {
         }
         // A job cancelled before it started has no output and nothing to
         // report, so there is no reason to keep it
-        jobs.values().removeIf(job -> job.cancelled && !job.started.get());
+        jobs.values().removeIf(job -> {
+            if (!job.cancelled || job.started.get()) return false;
+            LOG.debugf("%s Forgotten, as it was cancelled before it started", job);
+            return true;
+        });
     }
 }
