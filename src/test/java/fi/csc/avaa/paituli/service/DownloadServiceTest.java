@@ -440,11 +440,12 @@ public class DownloadServiceTest {
         try (LogCapture log = LogCapture.of(DownloadService.class)) {
             runOnWorker(job);
 
-            assertThat(job.error).contains("disk full");
+            // The details may describe the server, so only the log gets them
+            assertThat(job.error).isEqualTo(DownloadService.SERVER_ERROR);
             assertThat(log.lines())
                     .filteredOn(line -> line.level().equals("ERROR"))
                     .extracting(Line::message, Line::thrown)
-                    .containsExactly(tuple(job + " Failed: " + job.error, failure));
+                    .containsExactly(tuple(job + " Failed: java.io.IOException: disk full", failure));
         }
     }
 
