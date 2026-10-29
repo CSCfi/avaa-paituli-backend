@@ -258,7 +258,15 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .anyMatch(message -> message.contains(
+                            "Resolved 2 requested paths to 3 existing paths, 0.0 GiB of the 15 GiB limit"));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
