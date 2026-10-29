@@ -3,6 +3,7 @@ package fi.csc.avaa.paituli.download;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.download.io.FileOperations;
 import fi.csc.avaa.paituli.download.io.FileSizeOperations;
+import fi.csc.avaa.paituli.download.io.FileSizesException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.service.LogService;
@@ -345,6 +347,63 @@ public class DownloadGeneratorTest {
             // The missing file is logged before the job fails on having none
             assertThat(log.lines()).extracting(Line::level).containsExactly("ERROR");
         }
+    }
+
+    @Test
+    public void wildcardWithoutMatchesShouldNameOnlyTheRequestedPath() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("file*.zip");
+        Mockito.when(fileOperations.findFilenamesMatchingRegex(anyString(), anyString()))
+                .thenReturn(Collections.emptyList());
+
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            // The message reaches the client, so it must not reveal the input root
+            DownloadRequestException err = Assertions.assertThrows(DownloadRequestException.class, () -> {
+                    processDummyJob(request);
+            });
+            assertThat(err.getMessage())
+                    .isEqualTo("No files match the requested path file*.zip")
+                    .doesNotContain(inputPath);
+
+            // The log does, for whoever fixes it
+            assertThat(log.lines()).extracting(Line::level).containsExactly("ERROR");
+            assertThat(log.lines().get(0).message()).contains(absolutePathFor("file*.zip"));
+        }
+    }
+
+    @Test
+    public void requestOverTheSizeLimitShouldBeRefused() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("big.zip");
+        Mockito.when(fileOperations.fileExists(absolutePathFor("big.zip"))).thenReturn(true);
+        generator.fileSizeOperations = Mockito.mock(FileSizeOperations.class);
+        Mockito.when(generator.fileSizeOperations.count(anyList())).thenReturn(16L * 1024 * 1024 * 1024);
+
+        FileSizesException err = Assertions.assertThrows(FileSizesException.class, () -> {
+                processDummyJob(request);
+        });
+        assertThat(err.getMessage())
+                .isEqualTo("The requested files total 16.0 GiB, over the 15 GiB limit");
+        Mockito.verify(fileOperations, Mockito.never()).zipper(any(), anyList());
+    }
+
+    @Test
+    public void requestJustOverTheSizeLimitShouldNotReadAsEqualToIt() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("big.zip");
+        Mockito.when(fileOperations.fileExists(absolutePathFor("big.zip"))).thenReturn(true);
+        generator.fileSizeOperations = Mockito.mock(FileSizeOperations.class);
+        // 15 GiB and 40 MiB
+        Mockito.when(generator.fileSizeOperations.count(anyList())).thenReturn((15L * 1024 + 40) * 1024 * 1024);
+
+        FileSizesException err = Assertions.assertThrows(FileSizesException.class, () -> {
+                processDummyJob(request);
+        });
+        assertThat(err.getMessage())
+                .isEqualTo("The requested files total 15.1 GiB, over the 15 GiB limit");
     }
 
     @Test

@@ -55,8 +55,7 @@ public class DownloadResourceTest {
     public void shouldReportFailureWhenErrorHasNoMessage() {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
-        // DownloadGenerator assigns err.getMessage(), which is null for any
-        // exception constructed without one (e.g. a bare NPE).
+        // DownloadService never assigns null, but serveOutput tolerates it
         job.error = null;
         job.progress = 1.0;
 

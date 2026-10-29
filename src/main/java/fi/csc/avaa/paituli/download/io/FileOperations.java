@@ -49,8 +49,7 @@ public class FileOperations {
                     .collect(Collectors.toList());
         } catch (NoSuchFileException | NotDirectoryException e) {
             // A directory that doesn't exist, such as one with a wildcard in
-            // its name, has no matching files. That is the request's problem,
-            // not the server's.
+            // its name, has no matching files, which the caller reports
             return List.of();
         } catch (IOException e) {
             throw new FileOperationException(e);
