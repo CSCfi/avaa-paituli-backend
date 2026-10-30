@@ -1,9 +1,11 @@
 package fi.csc.avaa.paituli.service;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.context.ManagedExecutor;
@@ -13,10 +15,10 @@ import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.download.DownloadRequestException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.PostConstruct;
-import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -67,21 +69,45 @@ public class DownloadService {
             outputPath, maxConcurrentJobs, keepAliveTimeout.toSeconds());
     }
 
-    // Set on shutdown, so the jobs it interrupts aren't logged as failures
+    // Stops the jobs when the application shuts down. This runs before the
+    // rest of the application is torn down, so a job's last steps, such as
+    // its statistics write, still work.
+    void onStop(@Observes ShutdownEvent event) {
+        shutdown();
+    }
+
+    // How long shutdown waits for cancelled jobs to stop before interrupting them
+    private static final Duration STOP_TIMEOUT = Duration.ofSeconds(10);
+
+    // Set on shutdown, so no new job starts and a job it interrupts isn't
+    // logged as a failure
     private volatile boolean shuttingDown;
 
-    // Jobs don't survive a restart anyway, so queued ones are dropped and
-    // running ones interrupted
-    @PreDestroy
+    // Jobs don't survive a restart anyway. Started ones are cancelled, which
+    // stops a running job within one chunk of copying and a queued one
+    // before it starts. An interrupt doesn't reliably stop a copy, so it is
+    // only the fallback for jobs that don't stop in time.
     void shutdown() {
         shuttingDown = true;
-        long unfinished = jobs.values().stream()
+        List<DownloadJob> unfinished = jobs.values().stream()
             .filter(job -> job.started.get() && job.processing() && !job.cancelled && !job.failed())
-            .count();
-        if (unfinished > 0) {
-            LOG.warnf("Unfinished jobs lost in shutdown: %d", unfinished);
+            .toList();
+        if (!unfinished.isEmpty()) {
+            LOG.warnf("Unfinished jobs lost in shutdown: %d", unfinished.size());
         }
-        managedExecutor.shutdownNow();
+        unfinished.forEach(job -> cancel(job, "service shutting down"));
+
+        managedExecutor.shutdown();
+        boolean stopped = false;
+        try {
+            stopped = managedExecutor.awaitTermination(STOP_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        if (!stopped) {
+            LOG.warnf("Jobs still running %d s into shutdown, interrupting them", STOP_TIMEOUT.toSeconds());
+            managedExecutor.shutdownNow();
+        }
     }
 
     // Job storage (could later move to DB/Redis)
@@ -108,7 +134,7 @@ public class DownloadService {
 
     // Starts processing at most once, and never for a job cancelled before it started
     private void start(DownloadJob job) {
-        if (job.cancelled || !job.started.compareAndSet(false, true)) return;
+        if (job.cancelled || shuttingDown || !job.started.compareAndSet(false, true)) return;
 
         // While maxConcurrentJobs are running, the job waits in the executor's
         // queue with progress at 0. A job cancelled while waiting never runs.
@@ -126,7 +152,8 @@ public class DownloadService {
             downloadGenerator.processJob(job);
         } catch (Throwable err) {
             if (shuttingDown) {
-                // The interrupt makes the copy fail; shutdown() has logged the loss
+                // shutdown() interrupted it, which made the copy fail, and has
+                // logged the loss
                 LOG.infof("%s Interrupted by shutdown", job);
                 return;
             }

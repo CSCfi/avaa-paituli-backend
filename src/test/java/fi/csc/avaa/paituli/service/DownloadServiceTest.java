@@ -481,21 +481,62 @@ public class DownloadServiceTest {
     }
 
     @Test
-    public void shutdownShouldWarnAboutUnfinishedJobs() {
+    public void shutdownShouldCancelAndWarnAboutUnfinishedJobs() throws InterruptedException {
+        Mockito.when(managedExecutor.awaitTermination(Mockito.anyLong(), any())).thenReturn(true);
         DownloadJob running = storedJob();
         service.pollJob(running.ID);
         DownloadJob completed = storedJob();
         service.pollJob(completed.ID);
         completed.progress = 1.0;
         // Never polled, so never started and nothing lost
-        storedJob();
+        DownloadJob neverStarted = storedJob();
 
         try (LogCapture log = LogCapture.of(DownloadService.class)) {
             service.shutdown();
 
+            assertThat(running.cancelled).isTrue();
+            assertThat(completed.cancelled).isFalse();
+            assertThat(neverStarted.cancelled).isFalse();
             assertThat(log.lines())
                     .extracting(Line::level, Line::message)
-                    .containsExactly(tuple("WARN", "Unfinished jobs lost in shutdown: 1"));
+                    .containsExactly(
+                            tuple("WARN", "Unfinished jobs lost in shutdown: 1"),
+                            tuple("INFO", running + " Cancelled: service shutting down"));
+        }
+        Mockito.verify(managedExecutor, never()).shutdownNow();
+    }
+
+    @Test
+    public void runningJobShouldStopWhenShutdownCancelsIt() throws InterruptedException {
+        // A real executor, so shutdown really waits for the job
+        service.maxConcurrentJobs = 1;
+        service.init();
+        CountDownLatch running = new CountDownLatch(1);
+        // Like the copy loop, the job checks for cancellation as it goes
+        Mockito.doAnswer(invocation -> {
+            DownloadJob job = invocation.getArgument(0);
+            running.countDown();
+            while (!job.cancelled) Thread.sleep(10);
+            return null;
+        }).when(downloadGenerator).processJob(any(DownloadJob.class));
+
+        DownloadJob job = storedJob();
+        service.pollJob(job.ID);
+        assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            long before = System.nanoTime();
+            service.shutdown();
+
+            // Stopped by the cancellation, well before the interrupt fallback
+            assertThat(Duration.ofNanos(System.nanoTime() - before)).isLessThan(Duration.ofSeconds(5));
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .contains(tuple("DEBUG", job + " Stopped after cancellation"))
+                    .noneMatch(line -> line.toList().contains("ERROR"));
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .noneMatch(message -> message.contains("still running"));
         }
     }
 
@@ -505,12 +546,14 @@ public class DownloadServiceTest {
         service.pollJob(job.ID);
         ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
         Mockito.verify(managedExecutor).runAsync(task.capture());
-        // Interrupting a copy makes it fail with an I/O error
-        Mockito.doThrow(new FileOperationException(new IOException("interrupted")))
-                .when(downloadGenerator).processJob(job);
+        // Shutdown arrives while the job runs, and its interrupt makes the
+        // copy fail with an I/O error
+        Mockito.doAnswer(invocation -> {
+            service.shutdown();
+            throw new FileOperationException(new IOException("interrupted"));
+        }).when(downloadGenerator).processJob(job);
 
         try (LogCapture log = LogCapture.of(DownloadService.class)) {
-            service.shutdown();
             task.getValue().run();
 
             assertThat(log.lines())
