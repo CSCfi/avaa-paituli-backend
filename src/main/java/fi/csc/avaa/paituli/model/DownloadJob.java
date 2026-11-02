@@ -2,6 +2,7 @@ package fi.csc.avaa.paituli.model;
 
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class DownloadJob {
@@ -14,9 +15,15 @@ public class DownloadJob {
     public final String outputFilename;
     public final String outputFilePath;
 
+    // Claimed once, by the first status poll, when processing is started
+    public final AtomicBoolean started = new AtomicBoolean();
+
     public volatile double progress; // from 0.0 to 1.0
     public volatile boolean cancelled;
     public volatile String error;
+
+    // When a client last asked about this job, as System.nanoTime()
+    public volatile long lastSeen;
 
     public DownloadJob(
         DownloadRequest request,
@@ -36,6 +43,7 @@ public class DownloadJob {
 
         this.progress = 0;
         this.error = "";
+        this.lastSeen = System.nanoTime();
     }
 
     public boolean processing() { return this.progress < 1.0; }

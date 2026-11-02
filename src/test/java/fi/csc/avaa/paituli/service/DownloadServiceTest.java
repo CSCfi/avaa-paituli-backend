@@ -3,11 +3,18 @@ package fi.csc.avaa.paituli.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -42,6 +49,7 @@ public class DownloadServiceTest {
         // Dummy configs so we don't have to boot up testcontainers
         service.filePrefix = filePrefix;
         service.outputPath = outputPath;
+        service.keepAliveTimeout = Duration.ofSeconds(15);
     }
 
     public void interceptAsyncJobProcessing() {
@@ -83,7 +91,7 @@ public class DownloadServiceTest {
     }
 
     @Test
-    public void createdJobShouldBeDispatchedToTheGenerator() {
+    public void firstPollShouldDispatchJobToTheGenerator() {
         interceptAsyncJobProcessing();
         Mockito.doNothing().when(downloadGenerator).processJob(any(DownloadJob.class));
 
@@ -92,6 +100,11 @@ public class DownloadServiceTest {
 
         DownloadJob job = service.createDownloadJob(request);
 
+        // Creating a job alone does no work
+        Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
+
+        service.pollJob(job.ID);
+
         // The job the caller gets back must be the one handed to the worker
         Mockito.verify(downloadGenerator).processJob(job);
     }
@@ -99,5 +112,229 @@ public class DownloadServiceTest {
     @Test
     public void unknownJobIdShouldReturnNull() {
         assertThat(service.getJob("no-such-job")).isNull();
+    }
+
+    // Shorthand for a job that is not tied to a real output directory
+    private DownloadJob dummyJob() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        return new DownloadJob(request, filePrefix, outputPath);
+    }
+
+    @Test
+    public void processingJobShouldBeCancelled() {
+        DownloadJob job = dummyJob();
+        job.progress = 0.4;
+
+        assertThat(service.cancel(job)).isTrue();
+        assertThat(job.cancelled).isTrue();
+    }
+
+    @Test
+    public void cancellingCompletedJobShouldNotDestroyItsOutput() {
+        DownloadJob job = dummyJob();
+        job.progress = 1.0;
+
+        // A cancel arriving after completion must not deny access to a package
+        // that is complete and still on disk.
+        assertThat(service.cancel(job)).isFalse();
+        assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void cancellingAlreadyCancelledJobShouldBeANoOp() {
+        DownloadJob job = dummyJob();
+        job.cancelled = true;
+
+        // A cancelled job never reaches progress 1.0, so it still looks
+        // "processing", but there is nothing left to cancel
+        assertThat(service.cancel(job)).isFalse();
+    }
+
+    @Test
+    public void cancellingFailedJobShouldNotMaskTheFailure() {
+        DownloadJob job = dummyJob();
+
+        // A failed job never reaches progress 1.0, so it still looks "processing"
+        job.error = "something broke";
+
+        // The failure is the more useful thing to report, and cancelling
+        // something that already stopped should not change what is reported.
+        assertThat(service.cancel(job)).isFalse();
+        assertThat(job.cancelled).isFalse();
+    }
+
+    // Shorthand for a job held by the service, so the keep-alive sweep sees it
+    private DownloadJob storedJob() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        return service.createDownloadJob(request);
+    }
+
+    private static long seconds(long seconds) {
+        return Duration.ofSeconds(seconds).toNanos();
+    }
+
+    @Test
+    public void lookingUpJobShouldMarkItAsSeen() {
+        DownloadJob job = storedJob();
+        job.lastSeen = System.nanoTime() - seconds(60);
+        long before = System.nanoTime();
+
+        service.getJob(job.ID);
+
+        assertThat(job.lastSeen).isGreaterThanOrEqualTo(before);
+    }
+
+    @Test
+    public void jobNotSeenWithinTimeoutShouldBeCancelled() {
+        DownloadJob job = storedJob();
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+        assertThat(job.cancelled).isTrue();
+    }
+
+    @Test
+    public void jobSeenWithinTimeoutShouldKeepRunning() {
+        DownloadJob job = storedJob();
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(14));
+
+        assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void lookingUpJobShouldKeepItFromBeingCancelled() {
+        DownloadJob job = storedJob();
+        job.lastSeen = System.nanoTime() - seconds(60);
+
+        // The frontend's status poll, arriving before the sweep
+        service.getJob(job.ID);
+        service.cancelAbandonedJobs(System.nanoTime());
+
+        assertThat(job.cancelled).isFalse();
+    }
+
+    @Test
+    public void abandonedJobThatAlreadyStoppedShouldNotBeCancelled() {
+        DownloadJob completed = storedJob();
+        completed.progress = 1.0;
+        DownloadJob failed = storedJob();
+        failed.error = "something broke";
+
+        service.cancelAbandonedJobs(System.nanoTime() + seconds(60));
+
+        // The sweep follows the same policy as a cancel from the client
+        assertThat(completed.cancelled).isFalse();
+        assertThat(failed.cancelled).isFalse();
+    }
+
+    @Test
+    public void repeatedPollsShouldStartJobOnce() {
+        DownloadJob job = storedJob();
+
+        service.pollJob(job.ID);
+        service.pollJob(job.ID);
+        service.pollJob(job.ID);
+
+        Mockito.verify(managedExecutor, times(1)).runAsync(any(Runnable.class));
+    }
+
+    @Test
+    public void lookupsOtherThanPollShouldNotStartJob() {
+        DownloadJob job = storedJob();
+
+        // Cancel and download requests look the job up with getJob
+        service.getJob(job.ID);
+
+        Mockito.verify(managedExecutor, never()).runAsync(any(Runnable.class));
+    }
+
+    @Test
+    public void jobCancelledBeforeFirstPollShouldNeverStart() {
+        DownloadJob job = storedJob();
+
+        service.cancel(job);
+        service.pollJob(job.ID);
+
+        Mockito.verify(managedExecutor, never()).runAsync(any(Runnable.class));
+    }
+
+    @Test
+    public void abandonedJobThatNeverStartedShouldBeForgotten() {
+        DownloadJob job = storedJob();
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+        assertThat(service.getJob(job.ID)).isNull();
+    }
+
+    @Test
+    public void abandonedJobThatStartedShouldBeKept() {
+        DownloadJob job = storedJob();
+        service.pollJob(job.ID);
+
+        service.cancelAbandonedJobs(job.lastSeen + seconds(16));
+
+        // It may have output on disk; how long finished jobs are kept is
+        // deferred to FINDINGS #10
+        assertThat(job.cancelled).isTrue();
+        assertThat(service.getJob(job.ID)).isSameAs(job);
+    }
+
+    @Test
+    public void jobCancelledWhileWaitingShouldNeverRun() {
+        DownloadJob job = storedJob();
+        service.pollJob(job.ID);
+
+        ArgumentCaptor<Runnable> queued = ArgumentCaptor.forClass(Runnable.class);
+        Mockito.verify(managedExecutor).runAsync(queued.capture());
+
+        // Cancelled before its turn comes
+        service.cancel(job);
+        queued.getValue().run();
+
+        Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
+    }
+
+    @Test
+    public void jobsBeyondTheCapShouldWaitAtZeroProgress() throws InterruptedException {
+        // A real executor instead of the mock, capped at two jobs
+        service.maxConcurrentJobs = 2;
+        service.init();
+
+        // Each job reports some progress, then holds its slot until released
+        CountDownLatch running = new CountDownLatch(3);
+        CountDownLatch release = new CountDownLatch(1);
+        Mockito.doAnswer(invocation -> {
+            DownloadJob job = invocation.getArgument(0);
+            job.progress = 0.5;
+            running.countDown();
+            release.await(5, TimeUnit.SECONDS);
+            return null;
+        }).when(downloadGenerator).processJob(any(DownloadJob.class));
+
+        try {
+            DownloadJob first = storedJob();
+            DownloadJob second = storedJob();
+            DownloadJob third = storedJob();
+            service.pollJob(first.ID);
+            service.pollJob(second.ID);
+            service.pollJob(third.ID);
+
+            // Two jobs run, and the third doesn't start while they hold the slots
+            assertThat(running.await(500, TimeUnit.MILLISECONDS)).isFalse();
+            assertThat(running.getCount()).isEqualTo(1);
+            assertThat(third.progress).isZero();
+
+            // Once a slot frees up, the waiting job gets its turn
+            release.countDown();
+            assertThat(running.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(third.progress).isEqualTo(0.5);
+        } finally {
+            release.countDown();
+            service.shutdown();
+        }
     }
 }
