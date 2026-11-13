@@ -29,7 +29,7 @@ import org.junit.jupiter.api.io.TempDir;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperations.ZipProgress;
 import fi.csc.avaa.paituli.model.DownloadJob;
-import fi.csc.avaa.paituli.model.DownloadRequest;
+import fi.csc.avaa.paituli.model.TestJobs;
 
 public class FileOperationsTest {
 
@@ -51,9 +51,7 @@ public class FileOperationsTest {
         fileOperations = new FileOperations();
         fileOperations.inputPath = inputDir + "/";
 
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        job = new DownloadJob(request, "test_", outputDir.toString());
+        job = TestJobs.job(DownloadType.ZIP, outputDir.toString());
     }
 
     private Path createFile(String relativePath, byte[] content) throws IOException {

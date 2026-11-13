@@ -3,6 +3,7 @@ package fi.csc.avaa.paituli.rest;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import fi.csc.avaa.paituli.model.TestJobs;
 import fi.csc.avaa.paituli.service.DownloadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,16 +31,12 @@ public class DownloadResourceTest {
     @InjectMocks
     DownloadResource downloadResource;
 
-    private final String outputPath = "/bar";
-    private final String filePrefix = "batman_";
-
     @Test
     public void shouldReturnStatus200AndJsonObject() {
 
         // Dummy request and job
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
+        DownloadRequest request = job.request;
 
         // Mock job creation
         Mockito.when(downloadService.createDownloadJob(request))
@@ -54,16 +51,9 @@ public class DownloadResourceTest {
         assertThat(entity.get("message")).isEqualTo("Job created");
     }
 
-    // Shorthand for a job that is not tied to a real output directory
-    private DownloadJob dummyJob() {
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        return new DownloadJob(request, filePrefix, outputPath);
-    }
-
     @Test
     public void shouldReportFailureWhenErrorHasNoMessage() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         // DownloadGenerator assigns err.getMessage(), which is null for any
         // exception constructed without one (e.g. a bare NPE).
@@ -84,7 +74,7 @@ public class DownloadResourceTest {
 
     @Test
     public void cancelShouldBeDelegatedToTheService() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
         Mockito.when(downloadService.cancel(job)).thenReturn(true);
@@ -101,7 +91,7 @@ public class DownloadResourceTest {
 
     @Test
     public void cancelRefusedByTheServiceShouldStillSucceed() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
         Mockito.when(downloadService.cancel(job)).thenReturn(false);
@@ -117,7 +107,7 @@ public class DownloadResourceTest {
 
     @Test
     public void statusShouldReportCancellation() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         // processJob never sets progress to 1.0 for a cancelled job, so without
         // an explicit flag the client sees a job frozen part-way forever.
@@ -146,7 +136,7 @@ public class DownloadResourceTest {
 
     @Test
     public void serveOutputShouldConflictWhileStillProcessing() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
         job.progress = 0.5;
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
@@ -158,7 +148,7 @@ public class DownloadResourceTest {
 
     @Test
     public void serveOutputShouldReportGoneWhenOutputWasCleaned() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         // Finished successfully, but nothing exists at outputFilePath
         job.progress = 1.0;
@@ -172,9 +162,7 @@ public class DownloadResourceTest {
 
     @Test
     public void serveOutputShouldAttachOutputFilename(@TempDir Path tempDir) throws IOException {
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        DownloadJob job = new DownloadJob(request, filePrefix, tempDir.toString());
+        DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
 
         job.progress = 1.0;
         Files.createFile(Path.of(job.outputFilePath));
