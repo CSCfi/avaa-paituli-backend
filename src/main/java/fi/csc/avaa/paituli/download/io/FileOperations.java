@@ -90,6 +90,9 @@ public class FileOperations {
                 copyPathToZip(path, zout, job);
                 // A path interrupted by cancellation was not fully zipped
                 if (!job.cancelled) numZipped++;
+                // Finish the archive along with its last path, so progress
+                // never reaches 1.0 while the archive is still incomplete
+                if (!pathsIterator.hasNext()) close();
                 return new ZipProgress(path, numZipped / (double)filePaths.size());
             }
 

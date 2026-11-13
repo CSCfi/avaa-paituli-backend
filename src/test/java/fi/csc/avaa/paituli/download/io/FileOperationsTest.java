@@ -119,6 +119,22 @@ public class FileOperationsTest {
     }
 
     @Test
+    public void archiveShouldBeCompleteOnceProgressReachesOne() throws IOException {
+        Path first = createFile("first.txt", "1".getBytes());
+        Path second = createFile("second.txt", "2".getBytes());
+
+        Iterator<ZipProgress> zipper =
+            fileOperations.zipper(job, List.of(first.toString(), second.toString())).iterator();
+        zipper.next();
+        ZipProgress last = zipper.next();
+
+        // The job publishes this progress before the iterator is asked for
+        // more, and a client seeing 1.0 downloads the archive right away
+        assertThat(last.progress()).isEqualTo(1.0);
+        assertThat(readOutput()).containsOnlyKeys("first.txt", "second.txt");
+    }
+
+    @Test
     public void cancelShouldStopBetweenPaths() throws IOException {
         Path first = createFile("first.txt", "1".getBytes());
         Path second = createFile("second.txt", "2".getBytes());
