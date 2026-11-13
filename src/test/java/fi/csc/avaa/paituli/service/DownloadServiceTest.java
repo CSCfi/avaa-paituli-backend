@@ -25,6 +25,7 @@ import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.DownloadGenerator;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
+import fi.csc.avaa.paituli.model.TestJobs;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadServiceTest {
@@ -41,14 +42,11 @@ public class DownloadServiceTest {
     @InjectMocks
     private DownloadService service;
 
-    private final String filePrefix = "batman_";
-    private final String outputPath = "/bar";
-
     @BeforeEach
     public void init() {
         // Dummy configs so we don't have to boot up testcontainers
-        service.filePrefix = filePrefix;
-        service.outputPath = outputPath;
+        service.filePrefix = TestJobs.FILE_PREFIX;
+        service.outputPath = TestJobs.OUTPUT_PATH;
         service.keepAliveTimeout = Duration.ofSeconds(15);
     }
 
@@ -66,8 +64,7 @@ public class DownloadServiceTest {
     public void createdJobShouldMatchRequestAndConfigFields() {
 
         // Dummy request
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
+        DownloadRequest request = TestJobs.request(DownloadType.ZIP);
 
         // Create job and ensure its contents are as we expect
         DownloadJob job = service.createDownloadJob(request);
@@ -81,9 +78,7 @@ public class DownloadServiceTest {
     public void jobShouldBeStoredAfterCreation() {
 
         // Create job with a dummy request
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        DownloadJob job = service.createDownloadJob(request);
+        DownloadJob job = service.createDownloadJob(TestJobs.request(DownloadType.ZIP));
 
         // Check that the job is now stored and its the one we expect
         DownloadJob stored = service.getJob(job.ID);
@@ -95,10 +90,7 @@ public class DownloadServiceTest {
         interceptAsyncJobProcessing();
         Mockito.doNothing().when(downloadGenerator).processJob(any(DownloadJob.class));
 
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-
-        DownloadJob job = service.createDownloadJob(request);
+        DownloadJob job = service.createDownloadJob(TestJobs.request(DownloadType.ZIP));
 
         // Creating a job alone does no work
         Mockito.verify(downloadGenerator, never()).processJob(any(DownloadJob.class));
@@ -114,16 +106,9 @@ public class DownloadServiceTest {
         assertThat(service.getJob("no-such-job")).isNull();
     }
 
-    // Shorthand for a job that is not tied to a real output directory
-    private DownloadJob dummyJob() {
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        return new DownloadJob(request, filePrefix, outputPath);
-    }
-
     @Test
     public void processingJobShouldBeCancelled() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
         job.progress = 0.4;
 
         assertThat(service.cancel(job)).isTrue();
@@ -132,7 +117,7 @@ public class DownloadServiceTest {
 
     @Test
     public void cancellingCompletedJobShouldNotDestroyItsOutput() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
         job.progress = 1.0;
 
         // A cancel arriving after completion must not deny access to a package
@@ -143,7 +128,7 @@ public class DownloadServiceTest {
 
     @Test
     public void cancellingAlreadyCancelledJobShouldBeANoOp() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
         job.cancelled = true;
 
         // A cancelled job never reaches progress 1.0, so it still looks
@@ -153,7 +138,7 @@ public class DownloadServiceTest {
 
     @Test
     public void cancellingFailedJobShouldNotMaskTheFailure() {
-        DownloadJob job = dummyJob();
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         // A failed job never reaches progress 1.0, so it still looks "processing"
         job.error = "something broke";
@@ -166,9 +151,7 @@ public class DownloadServiceTest {
 
     // Shorthand for a job held by the service, so the keep-alive sweep sees it
     private DownloadJob storedJob() {
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = DownloadType.ZIP;
-        return service.createDownloadJob(request);
+        return service.createDownloadJob(TestJobs.request(DownloadType.ZIP));
     }
 
     private static long seconds(long seconds) {

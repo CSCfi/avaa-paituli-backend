@@ -8,18 +8,9 @@ import fi.csc.avaa.paituli.constants.DownloadType;
 
 public class DownloadJobTest {
 
-    private final String filePrefix = "batman_";
-    private final String outputPath = "/bar";
-
-    private DownloadJob jobOfType(DownloadType type) {
-        DownloadRequest request = new DownloadRequest();
-        request.downloadType = type;
-        return new DownloadJob(request, filePrefix, outputPath);
-    }
-
     @Test
     public void newJobShouldStartUnfinishedAndClean() {
-        DownloadJob job = jobOfType(DownloadType.ZIP);
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         assertThat(job.progress).isEqualTo(0.0);
         assertThat(job.cancelled).isFalse();
@@ -30,7 +21,7 @@ public class DownloadJobTest {
     @Test
     public void newJobShouldCountAsJustSeen() {
         long before = System.nanoTime();
-        DownloadJob job = jobOfType(DownloadType.ZIP);
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         // Otherwise the keep-alive sweep could cancel a job before the
         // client has had a chance to poll it even once
@@ -39,7 +30,7 @@ public class DownloadJobTest {
 
     @Test
     public void processingShouldEndOnlyAtFullProgress() {
-        DownloadJob job = jobOfType(DownloadType.ZIP);
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         job.progress = 0.999;
         assertThat(job.processing()).isTrue();
@@ -50,7 +41,7 @@ public class DownloadJobTest {
 
     @Test
     public void failedShouldTreatNullMessageAsFailure() {
-        DownloadJob job = jobOfType(DownloadType.ZIP);
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         // Empty string is the "no error" sentinel
         assertThat(job.failed()).isFalse();
@@ -65,18 +56,18 @@ public class DownloadJobTest {
 
     @Test
     public void outputFilenameShouldUsePrefixAndTypeExtension() {
-        DownloadJob zip = jobOfType(DownloadType.ZIP);
-        DownloadJob list = jobOfType(DownloadType.LIST);
+        DownloadJob zip = TestJobs.job(DownloadType.ZIP);
+        DownloadJob list = TestJobs.job(DownloadType.LIST);
 
-        assertThat(zip.outputFilename).matches("batman_\\d{8}\\.zip");
-        assertThat(list.outputFilename).matches("batman_\\d{8}\\.txt");
-        assertThat(zip.outputFilePath).isEqualTo(outputPath + "/" + zip.outputFilename);
+        assertThat(zip.outputFilename).matches(TestJobs.FILE_PREFIX + "\\d{8}\\.zip");
+        assertThat(list.outputFilename).matches(TestJobs.FILE_PREFIX + "\\d{8}\\.txt");
+        assertThat(zip.outputFilePath).isEqualTo(TestJobs.OUTPUT_PATH + "/" + zip.outputFilename);
     }
 
     @Test
     public void jobsShouldHaveDistinctIdsAndFilenames() {
-        DownloadJob first = jobOfType(DownloadType.ZIP);
-        DownloadJob second = jobOfType(DownloadType.ZIP);
+        DownloadJob first = TestJobs.job(DownloadType.ZIP);
+        DownloadJob second = TestJobs.job(DownloadType.ZIP);
 
         assertThat(first.ID).isNotEqualTo(second.ID);
         assertThat(first.outputFilename).isNotEqualTo(second.outputFilename);
