@@ -1,5 +1,6 @@
 package fi.csc.avaa.paituli.download;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -103,6 +104,9 @@ public class DownloadGenerator {
         List<String> absolutePaths = new ArrayList<>();
         job.request.filePaths.forEach(filePath -> {
             String absolutePath = String.format("%s%s", inputPath, filePath);
+            if (!isUnderInputPath(absolutePath)) {
+                throw new DownloadRequestException("Requested path is outside the archive: " + filePath);
+            }
             // If we have a wildcard present we do a regex search
             if (absolutePath.contains("*")) {
                 List<String> found = findMatchingFiles(absolutePath);
@@ -132,6 +136,13 @@ public class DownloadGenerator {
                 .sorted()
                 .map(absolutePath -> String.format("%s%s", ftpBaseUrl, absolutePath))
                 .collect(Collectors.toList());
+    }
+
+    // Whether a path stays under inputPath once its ".." segments are resolved.
+    // The check is lexical, so symlinks inside the archive still work.
+    private boolean isUnderInputPath(String absolutePath) {
+        return Paths.get(absolutePath).normalize()
+                .startsWith(Paths.get(inputPath).normalize());
     }
 
     private List<String> findMatchingFiles(String absolutePath) {

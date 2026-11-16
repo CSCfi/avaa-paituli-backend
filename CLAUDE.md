@@ -70,7 +70,8 @@ fixed precedence — cancelled → error → still processing → output file mi
 
 ### Path resolution, zipping and output cleaning
 
-`collectAbsolutePaths` prefixes each client-supplied `filePath` with the configured `inputPath`. A
+`collectAbsolutePaths` prefixes each client-supplied `filePath` with the configured `inputPath`, and
+fails the job if `..` segments take the result outside it (a lexical check; symlinks are not resolved). A
 `*` switches to wildcard mode: `findMatchingFiles` splits on the **last** `/` and lists that one
 directory — no recursion, no wildcards in directory segments. A wildcard matching nothing is fatal;
 a plain path that doesn't exist is only logged and skipped.

@@ -415,6 +415,47 @@ public class DownloadGeneratorTest {
     }
 
     @Test
+    public void pathOutsideTheArchiveShouldBeRejected() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("../etc/passwd");
+
+        // The message reaches the client, so it must not reveal the input root
+        DownloadRequestException err = Assertions.assertThrows(DownloadRequestException.class, () -> {
+                processDummyJob(request);
+        });
+        assertThat(err.getMessage())
+                .isEqualTo("Requested path is outside the archive: ../etc/passwd")
+                .doesNotContain(inputPath);
+        Mockito.verifyNoInteractions(fileOperations);
+    }
+
+    @Test
+    public void wildcardOutsideTheArchiveShouldBeRejected() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.LIST;
+        request.filePaths = Collections.singletonList("../etc/pass*");
+
+        Assertions.assertThrows(DownloadRequestException.class, () -> {
+                processDummyJob(request);
+        });
+        Mockito.verifyNoInteractions(fileOperations);
+    }
+
+    @Test
+    public void siblingDirectorySharingTheArchivePrefixShouldBeRejected() {
+        // The input path is /foo/, and /foobar/ starts with the same characters
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("../foobar/file.zip");
+
+        Assertions.assertThrows(DownloadRequestException.class, () -> {
+                processDummyJob(request);
+        });
+        Mockito.verifyNoInteractions(fileOperations);
+    }
+
+    @Test
     public void exceptionsInFindFilenamesShouldBePropagated() {
         final String wildcardFilePath = "file*.zip";
         final List<String> filePaths = Collections.singletonList(wildcardFilePath);
