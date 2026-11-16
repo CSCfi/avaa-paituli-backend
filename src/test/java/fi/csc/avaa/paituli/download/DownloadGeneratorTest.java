@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.eclipse.microprofile.context.ManagedExecutor;
 import org.junit.jupiter.api.Assertions;
@@ -154,6 +155,7 @@ public class DownloadGeneratorTest {
 
         Mockito.when(fileOperations.fileExists(absolutePath))
                 .thenReturn(true);
+        filesStandForThemselves();
 
         DownloadJob job = processDummyJob(request);
 
@@ -201,6 +203,7 @@ public class DownloadGeneratorTest {
                 .thenReturn(true);
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
+        filesStandForThemselves();
 
         DownloadJob job = processDummyJob(request);
 
@@ -226,6 +229,39 @@ public class DownloadGeneratorTest {
         assertThat(stringCaptor.getValue())
                 .startsWith(outputPath + "/" + filePrefix)
                 .endsWith(DownloadType.LIST.getExtension());
+    }
+
+    @Test
+    public void directoryShouldBeListedAsTheFilesUnderIt() {
+        final String directoryPath = "dir/";
+        final String filePath = "file.zip";
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.LIST;
+        request.filePaths = Arrays.asList(directoryPath, filePath);
+
+        Mockito.when(fileOperations.fileExists(absolutePathFor(directoryPath)))
+                .thenReturn(true);
+        Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
+                .thenReturn(true);
+        Mockito.when(fileOperations.filesUnder(eq(absolutePathFor(directoryPath)), any()))
+                .thenReturn(Stream.of(
+                        absolutePathFor("dir/sub/b.tif"),
+                        absolutePathFor("dir/a.tif")));
+        Mockito.when(fileOperations.filesUnder(eq(absolutePathFor(filePath)), any()))
+                .thenReturn(Stream.of(absolutePathFor(filePath)));
+
+        processDummyJob(request);
+
+        Mockito.verify(fileOperations)
+                .writeUrlList(listCaptor.capture(), stringCaptor.capture());
+
+        // The directory itself is not listed, only the files under it
+        assertThat(listCaptor.getValue())
+                .containsExactly(
+                        ftpUrlFor(absolutePathFor("dir/a.tif")),
+                        ftpUrlFor(absolutePathFor("dir/sub/b.tif")),
+                        ftpUrlFor(absolutePathFor(filePath))
+                );
     }
 
     @Test
@@ -421,6 +457,12 @@ public class DownloadGeneratorTest {
 
     private String ftpUrlFor(String absolutePath) {
         return String.format("%s%s", ftpBaseUrl, absolutePath);
+    }
+
+    // Every path is a plain file, so the walk returns just the path itself
+    private void filesStandForThemselves() {
+        Mockito.when(fileOperations.filesUnder(anyString(), any()))
+                .thenAnswer(invocation -> Stream.of(invocation.getArgument(0, String.class)));
     }
 
     @Test

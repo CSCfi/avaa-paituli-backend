@@ -54,6 +54,23 @@ public class FileOperations {
         return Files.exists(Paths.get(absolutePath));
     }
 
+    // The files a path stands for: the path itself when it is a file, or every
+    // file under it, at any depth, when it is a directory. The walk is lazy and
+    // stops entering entries once the job is cancelled. Close the stream after use.
+    public Stream<String> filesUnder(String absolutePath, DownloadJob job) {
+        Path path = Paths.get(absolutePath);
+        if (!Files.isDirectory(path)) {
+            return Stream.of(absolutePath);
+        }
+        try {
+            return Files.list(path)
+                    .takeWhile(subPath -> !job.cancelled)
+                    .flatMap(subPath -> filesUnder(subPath.toAbsolutePath().toString(), job));
+        } catch (IOException e) {
+            throw new FileOperationException(e);
+        }
+    }
+
     public record ZipProgress(String added, double progress) {} 
 
     public Iterable<ZipProgress> zipper(DownloadJob job, List<String> filePaths) {
@@ -113,27 +130,8 @@ public class FileOperations {
     }
 
     private void copyPathToZip(String absolutePath, ZipOutputStream zout, DownloadJob job) {
-        if (Files.isDirectory(Paths.get(absolutePath))) {
-            copyDirectoryToZip(absolutePath, zout, job);
-        } else {
-            copyFileToZip(absolutePath, zout, job);
-        }
-    }
-
-    private void copyDirectoryToZip(String absolutePath, ZipOutputStream zout, DownloadJob job)  {
-        try (Stream<Path> subPaths = Files.list(Paths.get(absolutePath))) {
-            subPaths
-                    .takeWhile(subPath -> !job.cancelled)
-                    .map(Path::toAbsolutePath)
-                    .forEach(subPath -> {
-                        if (Files.isDirectory(subPath)) {
-                            copyDirectoryToZip(subPath.toString(), zout, job);
-                        } else {
-                            copyFileToZip(subPath.toString(), zout, job);
-                        }
-                    });
-        } catch (IOException e) {
-            throw new FileOperationException(e);
+        try (Stream<String> files = filesUnder(absolutePath, job)) {
+            files.forEach(file -> copyFileToZip(file, zout, job));
         }
     }
 

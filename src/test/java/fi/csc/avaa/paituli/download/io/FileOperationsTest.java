@@ -20,6 +20,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.stream.Stream;
 import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -79,6 +80,40 @@ public class FileOperationsTest {
 
     private void zipAll(List<String> paths) {
         for (ZipProgress zip : fileOperations.zipper(job, paths)) { }
+    }
+
+    private List<String> filesUnder(String absolutePath) {
+        try (Stream<String> files = fileOperations.filesUnder(absolutePath, job)) {
+            return files.toList();
+        }
+    }
+
+    @Test
+    public void filesUnderShouldReturnAFileAsItself() throws IOException {
+        Path file = createFile("data/a.txt", "a".getBytes());
+
+        assertThat(filesUnder(file.toString())).containsExactly(file.toString());
+    }
+
+    @Test
+    public void filesUnderShouldListEveryFileUnderADirectory() throws IOException {
+        Path a = createFile("dir/a.txt", "a".getBytes());
+        Path b = createFile("dir/sub/b.txt", "b".getBytes());
+        Path c = createFile("dir/sub/deeper/c.txt", "c".getBytes());
+        Files.createDirectories(inputDir.resolve("dir/empty"));
+
+        // Index rows name directories with a trailing slash
+        List<String> files = filesUnder(inputDir.resolve("dir") + "/");
+
+        assertThat(files).containsExactlyInAnyOrder(a.toString(), b.toString(), c.toString());
+    }
+
+    @Test
+    public void filesUnderShouldListNothingInADirectoryOnceCancelled() throws IOException {
+        createFile("dir/a.txt", "a".getBytes());
+        job.cancelled = true;
+
+        assertThat(filesUnder(inputDir.resolve("dir").toString())).isEmpty();
     }
 
     @Test

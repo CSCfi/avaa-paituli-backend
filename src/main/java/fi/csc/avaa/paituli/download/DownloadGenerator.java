@@ -128,6 +128,7 @@ public class DownloadGenerator {
     private List<String> collectFtpUrls(DownloadJob job) {
         return collectAbsolutePaths(job)
                 .stream()
+                .flatMap(absolutePath -> fileOperations.filesUnder(absolutePath, job))
                 .sorted()
                 .map(absolutePath -> String.format("%s%s", ftpBaseUrl, absolutePath))
                 .collect(Collectors.toList());
