@@ -68,6 +68,41 @@ public class DownloadService {
             outputPath, maxConcurrentJobs, keepAliveTimeout.toSeconds());
     }
 
+    // Set by drain() and never cleared: the restart that follows resets it
+    private volatile boolean draining;
+
+    // Prepares for a planned restart: no new jobs are accepted from here on,
+    // while the ones already accepted run to the end and their clients start
+    // downloading the output. The restart waits until waitingFor() is 0 or
+    // its own timeout runs out, and its stop then cancels whatever is left.
+    // The downloads themselves are left to the web server in front, which
+    // the restart waits for separately.
+    public void drain() {
+        if (draining) return;
+        draining = true;
+        LOG.infof("Draining for a restart: accepting no new jobs, waiting for %d jobs"
+                + " to finish and their downloads to start", waitingFor());
+    }
+
+    public boolean draining() {
+        return draining;
+    }
+
+    // Counts what a drain waits for: jobs running, queued, or waiting for
+    // their first poll, and finished jobs whose client hasn't requested the
+    // output yet. Abandoned finished jobs drop out after the keep-alive
+    // timeout, so the count reaches 0 even if their clients have left.
+    public long waitingFor() {
+        long now = System.nanoTime();
+        long keepAlive = keepAliveTimeout.toNanos();
+        long waiting = 0;
+        for (DownloadJob job : jobs.values()) {
+            if (job.cancelled || job.failed()) continue;
+            if (job.processing() || (!job.fetched && now - job.lastSeen <= keepAlive)) waiting++;
+        }
+        return waiting;
+    }
+
     // Stops the jobs when the application shuts down. This runs before the
     // rest of the application is torn down, so a job's last steps, such as
     // its statistics write, still work.
@@ -82,6 +117,8 @@ public class DownloadService {
     // logged as a failure
     private volatile boolean shuttingDown;
 
+    // A planned restart drains first, so this meets running jobs only when
+    // the drain timed out or the service is stopped without draining.
     // Jobs don't survive a restart anyway. Started ones are cancelled, which
     // stops a running job within one chunk of copying and a queued one
     // before it starts. An interrupt doesn't reliably stop a copy, so it is

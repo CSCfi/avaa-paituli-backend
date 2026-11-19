@@ -481,6 +481,61 @@ public class DownloadServiceTest {
     }
 
     @Test
+    public void drainShouldWaitForJobsAndTheirDownloads() {
+        DownloadJob running = storedJob();
+        service.pollJob(running.ID);
+        DownloadJob notPolledYet = storedJob();
+        DownloadJob completed = storedJob();
+        completed.progress = 1.0;
+        DownloadJob fetched = storedJob();
+        fetched.progress = 1.0;
+        fetched.fetched = true;
+        DownloadJob completedButAbandoned = storedJob();
+        completedButAbandoned.progress = 1.0;
+        completedButAbandoned.lastSeen = System.nanoTime() - seconds(16);
+        DownloadJob failed = storedJob();
+        failed.error = "failed";
+        DownloadJob cancelled = storedJob();
+        service.cancel(cancelled, "test");
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.drain();
+
+            assertThat(service.draining()).isTrue();
+            // The running job, the one not polled yet, and the completed one
+            // whose client is still around but hasn't requested the output
+            assertThat(service.waitingFor()).isEqualTo(3);
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .containsExactly(tuple("INFO",
+                            "Draining for a restart: accepting no new jobs, waiting for 3 jobs"
+                                    + " to finish and their downloads to start"));
+        }
+    }
+
+    @Test
+    public void finishedJobShouldCountUntilItsOutputIsRequested() {
+        DownloadJob completed = storedJob();
+        completed.progress = 1.0;
+        service.drain();
+        assertThat(service.waitingFor()).isEqualTo(1);
+
+        completed.fetched = true;
+
+        assertThat(service.waitingFor()).isZero();
+    }
+
+    @Test
+    public void jobAcceptedBeforeDrainingShouldStillStart() {
+        DownloadJob job = storedJob();
+        service.drain();
+
+        service.pollJob(job.ID);
+
+        Mockito.verify(managedExecutor).runAsync(any(Runnable.class));
+    }
+
+    @Test
     public void shutdownShouldCancelAndWarnAboutUnfinishedJobs() throws InterruptedException {
         Mockito.when(managedExecutor.awaitTermination(Mockito.anyLong(), any())).thenReturn(true);
         DownloadJob running = storedJob();

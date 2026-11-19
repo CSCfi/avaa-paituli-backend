@@ -52,6 +52,17 @@ public class DownloadResourceTest {
     }
 
     @Test
+    public void newJobShouldBeRefusedWhileDraining() {
+        DownloadRequest request = TestJobs.request(DownloadType.ZIP);
+        Mockito.when(downloadService.draining()).thenReturn(true);
+
+        Response response = downloadResource.generateDownload(request);
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        Mockito.verify(downloadService, Mockito.never()).createDownloadJob(Mockito.any());
+    }
+
+    @Test
     public void shouldReportFailureWhenErrorHasNoMessage() {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
@@ -173,5 +184,28 @@ public class DownloadResourceTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getHeaderString("Content-Disposition"))
             .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
+    }
+
+    @Test
+    public void servingOutputShouldMarkTheJobFetched(@TempDir Path tempDir) throws IOException {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.serveOutput(job.ID);
+
+        assertThat(job.fetched).isTrue();
+    }
+
+    @Test
+    public void outputNotServedShouldLeaveTheJobUnfetched() {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
+        job.progress = 0.5;
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.serveOutput(job.ID);
+
+        assertThat(job.fetched).isFalse();
     }
 }

@@ -43,9 +43,15 @@ public class DownloadResource {
         );
     }
 
-    // Starts a new download job 
+    // Starts a new download job, unless the service is draining for a restart
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
+        if (downloadService.draining()) {
+            return Response
+                .status(Response.Status.SERVICE_UNAVAILABLE)
+                .entity(Map.of("message", "The service is about to restart. Try again in a few minutes."))
+                .build();
+        }
         DownloadJob job = downloadService.createDownloadJob(downloadRequest);
         return Response.ok(jobResponse(job, "Job created")).build();
     }
@@ -116,7 +122,9 @@ public class DownloadResource {
                 .build();
         }
 
-        // All good for download
+        // All good for download. A drain waits for this request, but not for
+        // the transfer, which the web server in front finishes.
+        job.fetched = true;
         return Response
             .ok(output.toFile())
             .header(
