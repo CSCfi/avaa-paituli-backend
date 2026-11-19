@@ -55,8 +55,7 @@ public class DownloadResourceTest {
     public void shouldReportFailureWhenErrorHasNoMessage() {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
-        // DownloadGenerator assigns err.getMessage(), which is null for any
-        // exception constructed without one (e.g. a bare NPE).
+        // DownloadService never assigns null, but serveOutput tolerates it
         job.error = null;
         job.progress = 1.0;
 
@@ -77,12 +76,12 @@ public class DownloadResourceTest {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        Mockito.when(downloadService.cancel(job)).thenReturn(true);
+        Mockito.when(downloadService.cancel(job, "requested by client")).thenReturn(true);
 
         Response response = downloadResource.cancelDownload(job.ID);
 
         // Whether a job may be cancelled is the service's decision
-        Mockito.verify(downloadService).cancel(job);
+        Mockito.verify(downloadService).cancel(job, "requested by client");
         assertThat(response.getStatus()).isEqualTo(200);
         @SuppressWarnings("unchecked")
         Map<String, Object> entity = (Map<String, Object>) response.getEntity();
@@ -94,7 +93,7 @@ public class DownloadResourceTest {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        Mockito.when(downloadService.cancel(job)).thenReturn(false);
+        Mockito.when(downloadService.cancel(job, "requested by client")).thenReturn(false);
 
         Response response = downloadResource.cancelDownload(job.ID);
 

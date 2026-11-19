@@ -28,6 +28,13 @@ Then run the application with:
 export PAITULI_DOWNLOAD_OUTPUTPATH=/home/username/temp ; ./mvnw quarkus:dev
 ```
 
+### Log level
+
+The application's own log level is `DEBUG` in development mode and `INFO` otherwise. Set
+`PAITULI_LOG_LEVEL` (e.g. `DEBUG`, `INFO`, `WARN`) to change it, for example to `DEBUG` on staging
+or temporarily in production. The level is read at startup, so a change needs a restart. Framework
+output stays at `INFO`.
+
 ## Running tests
 
 The suite is split into two tiers, and they run in different Maven phases.

@@ -3,6 +3,7 @@ package fi.csc.avaa.paituli.download;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
@@ -23,13 +24,17 @@ import org.mockito.Mockito;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import fi.csc.avaa.paituli.LogCapture;
+import fi.csc.avaa.paituli.LogCapture.Line;
 import fi.csc.avaa.paituli.constants.DownloadType;
 import fi.csc.avaa.paituli.download.io.FileOperationException;
 import fi.csc.avaa.paituli.download.io.FileOperations;
 import fi.csc.avaa.paituli.download.io.FileSizeOperations;
+import fi.csc.avaa.paituli.download.io.FileSizesException;
 import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.service.LogService;
+import io.quarkus.runtime.StartupEvent;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadGeneratorTest {
@@ -62,6 +67,17 @@ public class DownloadGeneratorTest {
     public void init() {
         generator.inputPath = inputPath;
         generator.ftpBaseUrl = ftpBaseUrl;
+    }
+
+    @Test
+    public void startupShouldLogTheConfig() {
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            generator.onStart(new StartupEvent());
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .containsExactly("Reading files from /foo/, URL lists pointing to http://ftp.example.com");
+        }
     }
 
     // Shorthand method
@@ -226,7 +242,17 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath2)))
                 .thenReturn(false);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            List<Line> warnings = log.lines().stream()
+                    .filter(line -> line.level().equals("WARN"))
+                    .toList();
+            assertThat(warnings).hasSize(1);
+            assertThat(warnings.get(0).message())
+                    .contains(job.ID.substring(0, 8), absolutePathFor(filePath2));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
@@ -269,7 +295,15 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.findFilenamesMatchingRegex(basePath, wildcardFilePathAsRegex))
                 .thenReturn(matchingFiles);
 
-        DownloadJob job = processDummyJob(request);
+        DownloadJob job;
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            job = processDummyJob(request);
+
+            assertThat(log.lines())
+                    .extracting(Line::message)
+                    .anyMatch(message -> message.contains(
+                            "Resolved 2 requested paths to 3 existing paths, 0.0 GiB of the 15 GiB limit"));
+        }
 
         assertThat(job.outputFilename)
                 .startsWith(filePrefix)
@@ -305,9 +339,60 @@ public class DownloadGeneratorTest {
         Mockito.when(fileOperations.fileExists(absolutePathFor(filePath)))
                 .thenReturn(false);
 
-        Assertions.assertThrows(IllegalArgumentException.class, () -> {
+        Assertions.assertThrows(DownloadRequestException.class, () -> {
                 processDummyJob(request);
         });
+    }
+
+    @Test
+    public void wildcardWithoutMatchesShouldNameOnlyTheRequestedPath() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("file*.zip");
+        Mockito.when(fileOperations.findFilenamesMatchingRegex(anyString(), anyString()))
+                .thenReturn(Collections.emptyList());
+
+        // The message reaches the client, so it must not reveal the input root
+        DownloadRequestException err = Assertions.assertThrows(DownloadRequestException.class, () -> {
+                processDummyJob(request);
+        });
+        assertThat(err.getMessage())
+                .isEqualTo("No files match the requested path file*.zip")
+                .doesNotContain(inputPath);
+    }
+
+    @Test
+    public void requestOverTheSizeLimitShouldBeRefused() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("big.zip");
+        Mockito.when(fileOperations.fileExists(absolutePathFor("big.zip"))).thenReturn(true);
+        generator.fileSizeOperations = Mockito.mock(FileSizeOperations.class);
+        Mockito.when(generator.fileSizeOperations.count(anyList())).thenReturn(16L * 1024 * 1024 * 1024);
+
+        FileSizesException err = Assertions.assertThrows(FileSizesException.class, () -> {
+                processDummyJob(request);
+        });
+        assertThat(err.getMessage())
+                .isEqualTo("The requested files total 16.0 GiB, over the 15 GiB limit");
+        Mockito.verify(fileOperations, Mockito.never()).zipper(any(), anyList());
+    }
+
+    @Test
+    public void requestJustOverTheSizeLimitShouldNotReadAsEqualToIt() {
+        DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        request.filePaths = Collections.singletonList("big.zip");
+        Mockito.when(fileOperations.fileExists(absolutePathFor("big.zip"))).thenReturn(true);
+        generator.fileSizeOperations = Mockito.mock(FileSizeOperations.class);
+        // 15 GiB and 40 MiB
+        Mockito.when(generator.fileSizeOperations.count(anyList())).thenReturn((15L * 1024 + 40) * 1024 * 1024);
+
+        FileSizesException err = Assertions.assertThrows(FileSizesException.class, () -> {
+                processDummyJob(request);
+        });
+        assertThat(err.getMessage())
+                .isEqualTo("The requested files total 15.1 GiB, over the 15 GiB limit");
     }
 
     @Test
@@ -373,25 +458,41 @@ public class DownloadGeneratorTest {
     }
 
     @Test
-    public void jobShouldErrorAndNotLogIfGeneratingThrows() throws InterruptedException {
+    public void failedJobShouldNotBeLoggedToStatistics() {
 
         // Make generation throw
         Mockito.doThrow(new FileOperationException(new IOException("oops")))
                 .when(generator).generate(any());
 
-        // Make mock request and run its job
         final DownloadRequest request = new DownloadRequest();
         request.downloadType = DownloadType.ZIP;
 
-        // The generator propagates exceptions
-        DownloadJob job = new DownloadJob(request, filePrefix, outputPath);
+        // The failure propagates to DownloadService, which records it on the job
         Assertions.assertThrows(FileOperationException.class, () -> {
-                generator.processJob(job);
+                processDummyJob(request);
         });
-
-        // Ensure the throw is handled as expected
-        assert(job.error).contains("oops");
         Mockito.verifyNoInteractions(logService);
+    }
+
+    @Test
+    public void failedStatisticsWriteShouldNotFailTheJob() {
+        final DownloadRequest request = new DownloadRequest();
+        request.downloadType = DownloadType.ZIP;
+        Mockito.doNothing()
+                .when(generator).generate(any(DownloadJob.class));
+        RuntimeException failure = new RuntimeException("database down");
+        Mockito.doThrow(failure).when(logService).log(request);
+
+        try (LogCapture log = LogCapture.of(DownloadGenerator.class)) {
+            DownloadJob job = processDummyJob(request);
+
+            // The package is complete, so it stays available
+            assertThat(job.processing()).isFalse();
+            assertThat(log.lines())
+                    .filteredOn(line -> line.level().equals("ERROR"))
+                    .extracting(Line::thrown)
+                    .containsExactly(failure);
+        }
     }
 
 }
