@@ -21,6 +21,8 @@ public class DownloadJob {
     public volatile double progress; // from 0.0 to 1.0
     public volatile boolean cancelled;
     public volatile String error;
+    // Set when a download of the output starts
+    public volatile boolean fetched;
 
     // When the job was received, as System.nanoTime()
     public final long receivedAt;

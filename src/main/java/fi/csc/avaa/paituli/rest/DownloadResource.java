@@ -20,6 +20,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.StreamingOutput;
 
 @Path(Constants.PATH_DOWNLOAD)
 @Produces(MediaType.APPLICATION_JSON)
@@ -43,9 +44,15 @@ public class DownloadResource {
         );
     }
 
-    // Starts a new download job 
+    // Starts a new download job, unless the service is draining for a restart
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
+        if (downloadService.draining()) {
+            return Response
+                .status(Response.Status.SERVICE_UNAVAILABLE)
+                .entity(Map.of("message", "The service is about to restart. Try again in a few minutes."))
+                .build();
+        }
         DownloadJob job = downloadService.createDownloadJob(downloadRequest);
         return Response.ok(jobResponse(job, "Job created")).build();
     }
@@ -116,9 +123,19 @@ public class DownloadResource {
                 .build();
         }
 
-        // All good for download
+        // All good for download. It is streamed here rather than left to the
+        // framework, so the service knows when it ends: a drain waits for it.
+        StreamingOutput body = out -> {
+            downloadService.downloadStarted(job);
+            try {
+                Files.copy(output, out);
+            } finally {
+                downloadService.downloadFinished();
+            }
+        };
         return Response
-            .ok(output.toFile())
+            .ok(body)
+            .header("Content-Length", output.toFile().length())
             .header(
                 "Content-Disposition",
                 "attachment; filename=\"" + job.outputFilename + "\"")

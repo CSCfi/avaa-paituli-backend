@@ -56,6 +56,8 @@ public class DownloadServiceTest {
         service.filePrefix = TestJobs.FILE_PREFIX;
         service.outputPath = TestJobs.OUTPUT_PATH;
         service.keepAliveTimeout = Duration.ofSeconds(15);
+        service.jobDrainTimeout = Duration.ofMinutes(10);
+        service.downloadDrainTimeout = Duration.ofSeconds(60);
     }
 
     public void interceptAsyncJobProcessing() {
@@ -479,6 +481,85 @@ public class DownloadServiceTest {
                     .containsExactly(tuple("INFO",
                             "Writing downloads to /bar, at most 12 jobs at once, cancelling jobs unseen for 15 s"));
         }
+    }
+
+    @Test
+    public void drainShouldWaitForJobsAndTheirDownloads() {
+        DownloadJob running = storedJob();
+        service.pollJob(running.ID);
+        DownloadJob notPolledYet = storedJob();
+        DownloadJob completed = storedJob();
+        completed.progress = 1.0;
+        DownloadJob downloading = storedJob();
+        downloading.progress = 1.0;
+        service.downloadStarted(downloading);
+        DownloadJob downloaded = storedJob();
+        downloaded.progress = 1.0;
+        service.downloadStarted(downloaded);
+        service.downloadFinished();
+        DownloadJob completedButAbandoned = storedJob();
+        completedButAbandoned.progress = 1.0;
+        completedButAbandoned.lastSeen = System.nanoTime() - seconds(16);
+        DownloadJob failed = storedJob();
+        failed.error = "failed";
+        DownloadJob cancelled = storedJob();
+        service.cancel(cancelled, "test");
+
+        try (LogCapture log = LogCapture.of(DownloadService.class)) {
+            service.drain();
+
+            assertThat(service.draining()).isTrue();
+            // The running job, the one not polled yet, the completed one whose
+            // client is still around, and the download in progress
+            assertThat(service.waitingFor()).isEqualTo(4);
+            assertThat(log.lines())
+                    .extracting(Line::level, Line::message)
+                    .containsExactly(tuple("INFO",
+                            "Draining for a restart: accepting no new jobs, waiting for 4 jobs and downloads,"
+                                    + " up to 600 s for processing and then 60 s for downloads"));
+        }
+    }
+
+    @Test
+    public void drainShouldWaitForProcessingAndThenForDownloads() {
+        DownloadJob running = storedJob();
+        service.pollJob(running.ID);
+        DownloadJob downloading = storedJob();
+        downloading.progress = 1.0;
+        service.downloadStarted(downloading);
+        long start = System.nanoTime();
+        service.drain();
+
+        // Both, within the job timeout
+        assertThat(service.waitingFor(start + Duration.ofMinutes(9).toNanos())).isEqualTo(2);
+        // Past it, only the download, which now gets its own timeout
+        assertThat(service.waitingFor(start + Duration.ofMinutes(11).toNanos())).isEqualTo(1);
+        assertThat(service.waitingFor(start + Duration.ofMinutes(13).toNanos())).isZero();
+        // Cancelling the job is left to the stop that follows
+        assertThat(running.cancelled).isFalse();
+    }
+
+    @Test
+    public void downloadPhaseShouldStartOnceNothingIsProcessing() {
+        DownloadJob downloading = storedJob();
+        downloading.progress = 1.0;
+        service.downloadStarted(downloading);
+        long start = System.nanoTime();
+        service.drain();
+
+        // Nothing was processing, so the download timeout runs from the start
+        assertThat(service.waitingFor(start + seconds(30))).isEqualTo(1);
+        assertThat(service.waitingFor(start + seconds(90))).isZero();
+    }
+
+    @Test
+    public void jobAcceptedBeforeDrainingShouldStillStart() {
+        DownloadJob job = storedJob();
+        service.drain();
+
+        service.pollJob(job.ID);
+
+        Mockito.verify(managedExecutor).runAsync(any(Runnable.class));
     }
 
     @Test
