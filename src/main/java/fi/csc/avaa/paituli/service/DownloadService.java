@@ -5,8 +5,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.context.ManagedExecutor;
@@ -51,14 +49,10 @@ public class DownloadService {
     @ConfigProperty(name = "paituli.download.keepAliveTimeout")
     Duration keepAliveTimeout;
 
-    // How long a drain waits for jobs still processing
+    // How long a drain waits for its jobs, after which the restart it
+    // prepares for goes ahead and cancels the jobs left
     @ConfigProperty(name = "paituli.download.jobDrainTimeout")
     Duration jobDrainTimeout;
-
-    // How long a drain then waits for downloads of finished jobs, after which
-    // the restart it prepares for goes ahead and cancels the jobs left
-    @ConfigProperty(name = "paituli.download.downloadDrainTimeout")
-    Duration downloadDrainTimeout;
 
     // How many jobs may be processed at once; the rest wait for their turn
     @ConfigProperty(name = "paituli.download.maxConcurrentJobs")
@@ -94,74 +88,44 @@ public class DownloadService {
     // When the drain started, as System.nanoTime()
     private volatile long drainStartedAt;
 
-    // When the drain stopped waiting for processing and went on to wait only
-    // for downloads, as System.nanoTime(), or 0 before that
-    private final AtomicLong downloadPhaseStartedAt = new AtomicLong();
-
     // Prepares for a planned restart: no new jobs are accepted from here on,
-    // while the ones already accepted run to the end, and their clients can
-    // still download the output. The restart waits until waitingFor() is 0,
-    // and its stop then cancels whatever is left. Calling it again doesn't
-    // restart the timeouts.
+    // while the ones already accepted run to the end and their clients start
+    // downloading the output. The restart waits until waitingFor() is 0, and
+    // its stop then cancels whatever is left. The downloads themselves are
+    // left to the web server in front, which the restart waits for
+    // separately. Calling it again doesn't restart the timeout.
     public void drain() {
         if (draining) return;
         drainStartedAt = System.nanoTime();
         draining = true;
-        LOG.infof("Draining for a restart: accepting no new jobs, waiting for %d jobs and downloads,"
-                + " up to %d s for processing and then %d s for downloads",
-            waitingFor(), jobDrainTimeout.toSeconds(), downloadDrainTimeout.toSeconds());
+        LOG.infof("Draining for a restart: accepting no new jobs, waiting up to %d s for %d jobs"
+                + " to finish and their downloads to start",
+            jobDrainTimeout.toSeconds(), waitingFor());
     }
 
     public boolean draining() {
         return draining;
     }
 
-    // Counts what a drain waits for, in two phases. First the processing:
-    // jobs running, queued, or waiting for their first poll, up to
-    // jobDrainTimeout. Then only the downloads: finished jobs whose client
-    // hasn't started downloading the output yet, and downloads in progress,
-    // up to downloadDrainTimeout. Abandoned jobs drop out after the
-    // keep-alive timeout, so both reach 0 even if their clients have left.
+    // Counts what a drain waits for: jobs running, queued, or waiting for
+    // their first poll, and finished jobs whose client hasn't requested the
+    // output yet. Abandoned finished jobs drop out after the keep-alive
+    // timeout, so the count reaches 0 even if their clients have left.
+    // Past jobDrainTimeout it is 0 regardless.
     public long waitingFor() {
         return waitingFor(System.nanoTime());
     }
 
     long waitingFor(long now) {
+        if (draining && now - drainStartedAt > jobDrainTimeout.toNanos()) return 0;
+
         long keepAlive = keepAliveTimeout.toNanos();
-        long processing = 0;
-        long downloading = 0;
+        long waiting = 0;
         for (DownloadJob job : jobs.values()) {
             if (job.cancelled || job.failed()) continue;
-            if (job.processing()) processing++;
-            else if (!job.fetched && now - job.lastSeen <= keepAlive) downloading++;
+            if (job.processing() || (!job.fetched && now - job.lastSeen <= keepAlive)) waiting++;
         }
-        // Read after the jobs: a job seen as fetched has its download counted
-        // by then, so one that starts meanwhile isn't missed
-        downloading += downloads.get();
-        if (!draining) return processing + downloading;
-
-        if (processing > 0 && now - drainStartedAt <= jobDrainTimeout.toNanos()) {
-            return processing + downloading;
-        }
-        // The first call to find the processing over starts the download
-        // phase. The restart polls this, so that is within one poll of it.
-        downloadPhaseStartedAt.compareAndSet(0, now);
-        return now - downloadPhaseStartedAt.get() <= downloadDrainTimeout.toNanos() ? downloading : 0;
-    }
-
-    // Downloads of job output in progress
-    private final AtomicInteger downloads = new AtomicInteger();
-
-    // Called when a job's output starts and stops being sent to its client.
-    // The download is counted before the job stops counting as waiting for
-    // one, so waitingFor() never misses it in between.
-    public void downloadStarted(DownloadJob job) {
-        downloads.incrementAndGet();
-        job.fetched = true;
-    }
-
-    public void downloadFinished() {
-        downloads.decrementAndGet();
+        return waiting;
     }
 
     // Stops the jobs when the application shuts down. This runs before the

@@ -10,10 +10,11 @@ import jakarta.inject.Inject;
 
 // Lets a planned restart wait for the jobs already accepted instead of
 // cancelling them: POST /drain stops new jobs, and GET /drain reports how
-// many jobs and downloads to wait for, so the restart can wait for 0 and
-// then stop the service. Both are on the management interface, which
-// listens on localhost only, so they aren't reachable from outside the
-// server.
+// many jobs are still processing or waiting for their client to request the
+// output, so the restart can wait for 0 and then stop the service. The
+// downloads themselves are the web server's to finish. Both routes are on
+// the management interface, which listens on localhost only, so they aren't
+// reachable from outside the server.
 @ApplicationScoped
 public class DrainRoutes {
 

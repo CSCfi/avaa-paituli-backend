@@ -8,24 +8,19 @@ import fi.csc.avaa.paituli.service.DownloadService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.StreamingOutput;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(MockitoExtension.class)
 public class DownloadResourceTest {
@@ -192,44 +187,25 @@ public class DownloadResourceTest {
     }
 
     @Test
-    public void downloadShouldBeReportedWhenItStartsAndEnds(@TempDir Path tempDir) throws IOException {
+    public void servingOutputShouldMarkTheJobFetched(@TempDir Path tempDir) throws IOException {
         DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
         job.progress = 1.0;
-        Files.writeString(Path.of(job.outputFilePath), "zip");
+        Files.createFile(Path.of(job.outputFilePath));
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
 
-        Response response = downloadResource.serveOutput(job.ID);
-        // Not before the transfer itself starts
-        Mockito.verify(downloadService, Mockito.never()).downloadStarted(job);
+        downloadResource.serveOutput(job.ID);
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        ((StreamingOutput) response.getEntity()).write(out);
-
-        assertThat(out.toString()).isEqualTo("zip");
-        assertThat(response.getHeaderString("Content-Length")).isEqualTo("3");
-        InOrder order = Mockito.inOrder(downloadService);
-        order.verify(downloadService).downloadStarted(job);
-        order.verify(downloadService).downloadFinished();
+        assertThat(job.fetched).isTrue();
     }
 
     @Test
-    public void downloadCutShortShouldStillBeReportedAsEnded(@TempDir Path tempDir) throws IOException {
-        DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
-        job.progress = 1.0;
-        Files.writeString(Path.of(job.outputFilePath), "zip");
+    public void outputNotServedShouldLeaveTheJobUnfetched() {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
+        job.progress = 0.5;
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        // The client goes away mid-transfer
-        OutputStream gone = new OutputStream() {
-            @Override
-            public void write(int b) throws IOException {
-                throw new IOException("Connection reset");
-            }
-        };
 
-        Response response = downloadResource.serveOutput(job.ID);
+        downloadResource.serveOutput(job.ID);
 
-        assertThatThrownBy(() -> ((StreamingOutput) response.getEntity()).write(gone))
-            .isInstanceOf(IOException.class);
-        Mockito.verify(downloadService).downloadFinished();
+        assertThat(job.fetched).isFalse();
     }
 }

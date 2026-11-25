@@ -20,7 +20,6 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.StreamingOutput;
 
 @Path(Constants.PATH_DOWNLOAD)
 @Produces(MediaType.APPLICATION_JSON)
@@ -123,19 +122,11 @@ public class DownloadResource {
                 .build();
         }
 
-        // All good for download. It is streamed here rather than left to the
-        // framework, so the service knows when it ends: a drain waits for it.
-        StreamingOutput body = out -> {
-            downloadService.downloadStarted(job);
-            try {
-                Files.copy(output, out);
-            } finally {
-                downloadService.downloadFinished();
-            }
-        };
+        // All good for download. A drain waits for this request, but not for
+        // the transfer, which the web server in front finishes.
+        job.fetched = true;
         return Response
-            .ok(body)
-            .header("Content-Length", output.toFile().length())
+            .ok(output.toFile())
             .header(
                 "Content-Disposition",
                 "attachment; filename=\"" + job.outputFilename + "\"")
