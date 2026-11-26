@@ -5,6 +5,7 @@ import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.model.TestJobs;
 import fi.csc.avaa.paituli.service.DownloadService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +32,12 @@ public class DownloadResourceTest {
 
     @InjectMocks
     DownloadResource downloadResource;
+
+    @BeforeEach
+    public void init() {
+        // Not handed over to a web server, unless a test says so
+        downloadResource.accelRedirectPath = Optional.empty();
+    }
 
     @Test
     public void shouldReturnStatus200AndJsonObject() {
@@ -195,6 +203,24 @@ public class DownloadResourceTest {
 
         downloadResource.serveOutput(job.ID);
 
+        assertThat(job.fetched).isTrue();
+    }
+
+    @Test
+    public void outputShouldBeHandedToTheWebServerWhenConfigured(@TempDir Path tempDir) throws IOException {
+        downloadResource.accelRedirectPath = Optional.of("/outputs/");
+        DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeaderString("X-Accel-Redirect")).isEqualTo("/outputs/" + job.outputFilename);
+        assertThat(response.getHeaderString("Content-Disposition"))
+            .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
+        assertThat(response.hasEntity()).isFalse();
         assertThat(job.fetched).isTrue();
     }
 
