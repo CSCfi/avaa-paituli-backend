@@ -3,6 +3,7 @@ package fi.csc.avaa.paituli.rest;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.Optional;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -32,6 +33,12 @@ public class DownloadResource {
     @ConfigProperty(name = "paituli.download.outputPath")
     String outputPath;
 
+    // Where the web server in front serves outputPath from, for handing a
+    // download over to it with X-Accel-Redirect. Unset, the output is sent
+    // from here, as in dev, where nothing is in front.
+    @ConfigProperty(name = "paituli.download.accelRedirectPath")
+    Optional<String> accelRedirectPath;
+
     // A shorthand method to build responses
     private Map<String, Object> jobResponse(DownloadJob job, String message) {
         return Map.of(
@@ -43,9 +50,15 @@ public class DownloadResource {
         );
     }
 
-    // Starts a new download job 
+    // Starts a new download job, unless the service is draining for a restart
     @POST
     public Response generateDownload(@Valid DownloadRequest downloadRequest) {
+        if (downloadService.draining()) {
+            return Response
+                .status(Response.Status.SERVICE_UNAVAILABLE)
+                .entity(Map.of("message", "The service is about to restart. Try again in a few minutes."))
+                .build();
+        }
         DownloadJob job = downloadService.createDownloadJob(downloadRequest);
         return Response.ok(jobResponse(job, "Job created")).build();
     }
@@ -69,7 +82,7 @@ public class DownloadResource {
         DownloadJob job = downloadService.getJob(jobId);
         if (job == null) return Response.status(Response.Status.NOT_FOUND).build();
 
-        if (!downloadService.cancel(job)) {
+        if (!downloadService.cancel(job, "requested by client")) {
             return Response.ok(jobResponse(job, "Job is no longer processing")).build();
         }
         return Response.ok(jobResponse(job, "Job will be cancelled")).build();
@@ -116,9 +129,15 @@ public class DownloadResource {
                 .build();
         }
 
-        // All good for download
-        return Response
-            .ok(output.toFile())
+        // All good for download. A drain waits for this request, but not for
+        // the transfer, which the web server in front finishes.
+        job.fetched = true;
+        Response.ResponseBuilder response = accelRedirectPath
+            // The web server sends the file itself, so a restart here can't
+            // cut the download
+            .map(path -> Response.ok().header("X-Accel-Redirect", path + job.outputFilename))
+            .orElseGet(() -> Response.ok(output.toFile()));
+        return response
             .header(
                 "Content-Disposition",
                 "attachment; filename=\"" + job.outputFilename + "\"")

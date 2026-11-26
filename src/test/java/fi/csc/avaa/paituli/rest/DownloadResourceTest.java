@@ -5,6 +5,7 @@ import fi.csc.avaa.paituli.model.DownloadJob;
 import fi.csc.avaa.paituli.model.DownloadRequest;
 import fi.csc.avaa.paituli.model.TestJobs;
 import fi.csc.avaa.paituli.service.DownloadService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +32,12 @@ public class DownloadResourceTest {
 
     @InjectMocks
     DownloadResource downloadResource;
+
+    @BeforeEach
+    public void init() {
+        // Not handed over to a web server, unless a test says so
+        downloadResource.accelRedirectPath = Optional.empty();
+    }
 
     @Test
     public void shouldReturnStatus200AndJsonObject() {
@@ -52,11 +60,21 @@ public class DownloadResourceTest {
     }
 
     @Test
+    public void newJobShouldBeRefusedWhileDraining() {
+        DownloadRequest request = TestJobs.request(DownloadType.ZIP);
+        Mockito.when(downloadService.draining()).thenReturn(true);
+
+        Response response = downloadResource.generateDownload(request);
+
+        assertThat(response.getStatus()).isEqualTo(503);
+        Mockito.verify(downloadService, Mockito.never()).createDownloadJob(Mockito.any());
+    }
+
+    @Test
     public void shouldReportFailureWhenErrorHasNoMessage() {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
-        // DownloadGenerator assigns err.getMessage(), which is null for any
-        // exception constructed without one (e.g. a bare NPE).
+        // DownloadService never assigns null, but serveOutput tolerates it
         job.error = null;
         job.progress = 1.0;
 
@@ -77,12 +95,12 @@ public class DownloadResourceTest {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        Mockito.when(downloadService.cancel(job)).thenReturn(true);
+        Mockito.when(downloadService.cancel(job, "requested by client")).thenReturn(true);
 
         Response response = downloadResource.cancelDownload(job.ID);
 
         // Whether a job may be cancelled is the service's decision
-        Mockito.verify(downloadService).cancel(job);
+        Mockito.verify(downloadService).cancel(job, "requested by client");
         assertThat(response.getStatus()).isEqualTo(200);
         @SuppressWarnings("unchecked")
         Map<String, Object> entity = (Map<String, Object>) response.getEntity();
@@ -94,7 +112,7 @@ public class DownloadResourceTest {
         DownloadJob job = TestJobs.job(DownloadType.ZIP);
 
         Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
-        Mockito.when(downloadService.cancel(job)).thenReturn(false);
+        Mockito.when(downloadService.cancel(job, "requested by client")).thenReturn(false);
 
         Response response = downloadResource.cancelDownload(job.ID);
 
@@ -174,5 +192,46 @@ public class DownloadResourceTest {
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(response.getHeaderString("Content-Disposition"))
             .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
+    }
+
+    @Test
+    public void servingOutputShouldMarkTheJobFetched(@TempDir Path tempDir) throws IOException {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.serveOutput(job.ID);
+
+        assertThat(job.fetched).isTrue();
+    }
+
+    @Test
+    public void outputShouldBeHandedToTheWebServerWhenConfigured(@TempDir Path tempDir) throws IOException {
+        downloadResource.accelRedirectPath = Optional.of("/outputs/");
+        DownloadJob job = TestJobs.job(DownloadType.ZIP, tempDir.toString());
+        job.progress = 1.0;
+        Files.createFile(Path.of(job.outputFilePath));
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        Response response = downloadResource.serveOutput(job.ID);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getHeaderString("X-Accel-Redirect")).isEqualTo("/outputs/" + job.outputFilename);
+        assertThat(response.getHeaderString("Content-Disposition"))
+            .isEqualTo("attachment; filename=\"" + job.outputFilename + "\"");
+        assertThat(response.hasEntity()).isFalse();
+        assertThat(job.fetched).isTrue();
+    }
+
+    @Test
+    public void outputNotServedShouldLeaveTheJobUnfetched() {
+        DownloadJob job = TestJobs.job(DownloadType.ZIP);
+        job.progress = 0.5;
+        Mockito.when(downloadService.getJob(job.ID)).thenReturn(job);
+
+        downloadResource.serveOutput(job.ID);
+
+        assertThat(job.fetched).isFalse();
     }
 }

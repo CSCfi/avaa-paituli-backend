@@ -27,10 +27,8 @@ Single test class / method:
 Targeting a single integration test needs `-DfailIfNoSpecifiedTests=false`, otherwise the default
 execution fails on finding no matching unit test.
 
-A green `./mvnw test` prints **five** stack traces — four from negative-path tests in
-`DownloadGeneratorTest` hitting `LOG.error` in `DownloadGenerator.processJob`, one from
-`BuildInfoServiceTest` feeding invalid JSON to `BuildInfoService`. Expected; a sixth means something
-broke.
+A green `./mvnw test` prints **no** stack traces: tests that expect a logged error collect it with
+`LogCapture`, which keeps it off the console. A stack trace in the output means something broke.
 
 ## Local setup
 
@@ -90,7 +88,7 @@ consult, so output may vanish at any time — that is what `serveOutput`'s missi
 - Field injection with package-private `@Inject`; `@ApplicationScoped` beans.
 - DTOs and Panache entities use public fields, no getters. JSON binding is JSON-B
   (`quarkus-resteasy-jsonb`), not Jackson.
-- Logging is JBoss `org.jboss.logging.Logger`. `DatasetService` and `LogService` currently bypass it
-  for `printStackTrace`/`System.err` — follow the `Logger` convention in new code.
+- Logging is JBoss `org.jboss.logging.Logger`. `LogService` currently bypasses it for `System.err`
+  — follow the `Logger` convention in new code.
 - Bean Validation lives on `DownloadRequest` (`@NotEmpty`/`@NotNull`) and is triggered by `@Valid`
   on the resource method.

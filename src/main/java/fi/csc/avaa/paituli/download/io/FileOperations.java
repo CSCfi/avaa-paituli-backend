@@ -6,6 +6,8 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Enumeration;
@@ -45,6 +47,10 @@ public class FileOperations {
                     .filter(path -> path.getFileName().toString().matches(regex))
                     .map(path -> path.toFile().getAbsolutePath())
                     .collect(Collectors.toList());
+        } catch (NoSuchFileException | NotDirectoryException e) {
+            // A directory that doesn't exist, such as one with a wildcard in
+            // its name, has no matching files, which the caller reports
+            return List.of();
         } catch (IOException e) {
             throw new FileOperationException(e);
         }
@@ -68,7 +74,7 @@ public class FileOperations {
             {
                 try {
                     Path zipPath = Files.createFile(Paths.get(job.outputFilePath));
-                    LOG.info("Zipping " + zipPath); 
+                    LOG.debugf("%s Zipping to %s", job, zipPath);
                     zout = new ZipOutputStream(new BufferedOutputStream(Files.newOutputStream(zipPath)));
                 } catch (IOException e) {
                     throw new FileOperationException(e);

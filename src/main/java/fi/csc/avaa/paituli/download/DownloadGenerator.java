@@ -2,6 +2,7 @@ package fi.csc.avaa.paituli.download;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -13,7 +14,9 @@ import fi.csc.avaa.paituli.download.io.FileSizesException;
 import fi.csc.avaa.paituli.download.io.FileOperations.ZipProgress;
 import fi.csc.avaa.paituli.service.LogService;
 import fi.csc.avaa.paituli.model.DownloadJob;
+import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 @ApplicationScoped
@@ -38,6 +41,12 @@ public class DownloadGenerator {
     @ConfigProperty(name = "paituli.download.ftpBaseUrl")
     String ftpBaseUrl;
 
+    // Logs the effective config once at startup, so a deploy shows what the
+    // environment actually set
+    void onStart(@Observes StartupEvent event) {
+        LOG.infof("Reading files from %s, URL lists pointing to %s", inputPath, ftpBaseUrl);
+    }
+
     public void generate(DownloadJob job) {
         switch (job.request.downloadType) {
             case ZIP: generateZip(job); break;
@@ -48,32 +57,30 @@ public class DownloadGenerator {
         }
     }
 
+    // Generates the job's output. A failure is thrown to the caller, which
+    // records it on the job. DownloadService logs when the job starts and how
+    // it ends; this class logs the details in between.
     public void processJob(DownloadJob job) {
-        LOG.infof("%s Starting job processing", job);
-        try {
-            generate(job);
-        }
-        catch (Exception err) {
-            LOG.error("Could not generate download", err);
-            // getMessage() is null for exceptions constructed without one
-            job.error = err.getMessage() != null ? err.getMessage() : err.toString();
-            throw err;
-        }
-        if (job.cancelled) {
-            LOG.infof("%s Canceled", job);
-        }
-        else {
+        generate(job);
+        if (!job.cancelled) {
             job.progress = 1.0; // Signals job completion
-            LOG.infof("%s Completed with output %s", job, job.outputFilePath);
         }
-        logService.log(job.request);
+        // The download itself is done, so a failure here is only logged
+        try {
+            logService.log(job.request);
+        } catch (Exception err) {
+            LOG.errorf(err, "%s Could not record download statistics", job);
+        }
     }
 
     private void generateZip(DownloadJob job) {
         List<String> paths = collectAbsolutePaths(job);
         long filesSize = fileSizeOperations.count(paths);
+        LOG.debugf("%s Resolved %d requested paths to %d existing paths, %s of the %d GiB limit",
+            job, job.request.filePaths.size(), paths.size(), gib(filesSize), MAXSIZE / G);
         if (filesSize > MAXSIZE ) {
-            throw new FileSizesException(filesSize+" "+job.request.data_id);
+            throw new FileSizesException(String.format("The requested files total %s, over the %d GiB limit",
+                gibRoundedUp(filesSize), MAXSIZE / G));
         }
         // A job cancelled during the size check is not zipped, which would
         // otherwise leave an empty archive behind
@@ -87,6 +94,8 @@ public class DownloadGenerator {
 
     private void generateUrlList(DownloadJob job) {
         List<String> urls = collectFtpUrls(job);
+        LOG.debugf("%s Resolved %d requested paths to %d existing paths",
+            job, job.request.filePaths.size(), urls.size());
         fileOperations.writeUrlList(urls, job.outputFilePath);
     }
 
@@ -98,7 +107,9 @@ public class DownloadGenerator {
             if (absolutePath.contains("*")) {
                 List<String> found = findMatchingFiles(absolutePath);
                 if (found.isEmpty()) {
-                    throw new IllegalArgumentException("Did not find any matches for " + absolutePath);
+                    // As with a missing file below, someone should fix this
+                    LOG.errorf("%s Requested path matches no files: %s", job, absolutePath);
+                    throw new DownloadRequestException("No files match the requested path " + filePath);
                 }
                 absolutePaths.addAll(found);
             // Otherwise we simply add the file, if it exists.
@@ -106,12 +117,13 @@ public class DownloadGenerator {
                 if (fileOperations.fileExists(absolutePath)) {
                     absolutePaths.add(absolutePath);
                 } else {
-                    LOG.error("Requested file cannot be found from path " + absolutePath);
+                    // The catalogue and the filesystem disagree, which someone should fix
+                    LOG.errorf("%s Requested file not found, left out of the download: %s", job, absolutePath);
                 }
             }
         });
         if (absolutePaths.isEmpty()) {
-            throw new IllegalArgumentException("There were no existing files listed in the request");
+            throw new DownloadRequestException("There were no existing files listed in the request");
         }
         return absolutePaths;
     }
@@ -130,6 +142,17 @@ public class DownloadGenerator {
         String regex = toRegex(absolutePath.substring(lastSeparatorIndex + 1));
         List<String> found = fileOperations.findFilenamesMatchingRegex(basePath, regex);
         return found;
+    }
+
+    // Formats a size in bytes, e.g. "2.1 GiB"
+    private static String gib(long bytes) {
+        return String.format(Locale.ROOT, "%.1f GiB", bytes / (double) G);
+    }
+
+    // Like gib(), but rounded up, so a size just over a limit doesn't read
+    // as equal to it
+    private static String gibRoundedUp(long bytes) {
+        return String.format(Locale.ROOT, "%.1f GiB", Math.ceil(bytes * 10.0 / G) / 10);
     }
 
     private static String toRegex(String filenameWithWildcard) {
