@@ -3,6 +3,7 @@ package fi.csc.avaa.paituli.rest;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.Optional;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
@@ -31,6 +32,12 @@ public class DownloadResource {
 
     @ConfigProperty(name = "paituli.download.outputPath")
     String outputPath;
+
+    // Where the web server in front serves outputPath from, for handing a
+    // download over to it with X-Accel-Redirect. Unset, the output is sent
+    // from here, as in dev, where nothing is in front.
+    @ConfigProperty(name = "paituli.download.accelRedirectPath")
+    Optional<String> accelRedirectPath;
 
     // A shorthand method to build responses
     private Map<String, Object> jobResponse(DownloadJob job, String message) {
@@ -125,8 +132,12 @@ public class DownloadResource {
         // All good for download. A drain waits for this request, but not for
         // the transfer, which the web server in front finishes.
         job.fetched = true;
-        return Response
-            .ok(output.toFile())
+        Response.ResponseBuilder response = accelRedirectPath
+            // The web server sends the file itself, so a restart here can't
+            // cut the download
+            .map(path -> Response.ok().header("X-Accel-Redirect", path + job.outputFilename))
+            .orElseGet(() -> Response.ok(output.toFile()));
+        return response
             .header(
                 "Content-Disposition",
                 "attachment; filename=\"" + job.outputFilename + "\"")
